@@ -11,6 +11,7 @@ use bulletproofs::{BulletproofGens, PedersenGens};
 use merlin::Transcript;
 use bulletproofs_gadgets::gadget::Gadget;
 use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::MerkleTree256;
+use bulletproofs_gadgets::merkle_root_hash::merkle_root_hash_gadget::MerkleRootHash;
 use bulletproofs_gadgets::bounds_check::bounds_check_gadget::BoundsCheck;
 use bulletproofs_gadgets::mimc_hash::mimc_hash_gadget::MimcHash256;
 use bulletproofs_gadgets::mimc_hash::mimc::mimc_hash;
@@ -31,6 +32,8 @@ use std::fs::File;
 use std::env;
 use std::panic;
 use math::round;
+use curve25519_dalek::scalar::Scalar;
+use bulletproofs_gadgets::lalrpop::ast::GadgetOp::Merkle;
 
 // lalrpop parsers
 lalrpop_mod!(gadget_grammar, "/lalrpop/gadget_grammar.rs");
@@ -131,6 +134,7 @@ fn parse_gadget(
         GadgetOp::LessThan => less_than_gadget(line, assignments, verifier, index),
         GadgetOp::Inequality => inequality_gadget(line, assignments, verifier, index),
         GadgetOp::SetMembership => set_membership_gadget(line, assignments, verifier, index),
+        GadgetOp::MerkleRoot => merkle_root_hash_gadget(line, assignments, verifier, index),
         _ => {}
     }
 }
@@ -451,4 +455,35 @@ fn hash_instance(
     let image = mimc_hash(&instance_var);
 
     image.into()
+}
+
+
+fn merkle_root_hash_gadget(
+    line: &str,
+    assignments: &Assignments,
+    verifier: &mut VerifierBuffer,
+    index: usize
+) {
+    let merkle_parser = gadget_grammar::MerkleRootGadgetParser::new();
+    let (root, instance_vars, witness_vars, pattern) = merkle_parser.parse(&line).unwrap();
+
+    let root: LinearCombination = match root {
+        Var::Witness(_) => assignments.get_commitment(root, 0).into(),
+        Var::Instance(_) => be_to_scalar(&assignments.get_instance(root, Some(&assert_32))).into(),
+        _ => panic!("invalid state")
+    };
+    /*
+    let instance_vars: Vec<LinearCombination> = instance_vars.into_iter()
+        .map(|var| hash_instance(var, &assignments)).collect();
+
+    let mut hash_number = 0;
+    let witness_vars: Vec<LinearCombination> = witness_vars.into_iter()
+        .map(|var| {
+            let image_var = hash_witness(verifier, var, index, hash_number, &assignments);
+            hash_number += 1;
+            image_var.into()
+        }).collect();
+    */
+    let gadget = MerkleRootHash::new(root.into(), Vec::new().into(), Vec::new().into(), pattern.clone());
+    gadget.verify(verifier, &Vec::new(), &Vec::new());
 }

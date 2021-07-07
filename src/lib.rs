@@ -1,5 +1,6 @@
 #![feature(box_syntax, box_patterns)]
-
+#![allow(unused_parens)]
+#![allow(non_fmt_panic)]
 //------------------------------------------------------------------------
 // External dependencies
 //------------------------------------------------------------------------
@@ -20,7 +21,7 @@ extern crate lalrpop_util;
 mod macros;
 #[macro_use]
 pub mod merkle_tree;
-
+pub mod merkle_root_hash;
 //------------------------------------------------------------------------
 // Public modules
 //------------------------------------------------------------------------

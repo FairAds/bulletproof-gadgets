@@ -30,5 +30,13 @@ path = "src/bin/prover.rs"
 name = "verifier"
 path = "src/bin/verifier.rs"
 
+[[bin]]
+name = "merkle_root"
+path = "src/bin/merkle_root.rs"
+
+[[bin]]
+name = "mimc_hash"
+path = "src/bin/mimc_hash.rs"
+
 [[test]]
 name = "combine_gadgets"

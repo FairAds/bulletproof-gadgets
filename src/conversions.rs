@@ -1,6 +1,7 @@
 use crate::curve25519_dalek::scalar::Scalar;
 use bulletproofs::r1cs::{Variable, LinearCombination};
 use std::convert::TryInto;
+use std::str;
 
 /// Constructs 32 byte Scalars from the given byte vector in little endian order
 pub fn le_to_scalars(bytes: &Vec<u8>) -> Vec<Scalar> {
@@ -93,6 +94,80 @@ pub fn scalars_to_lc(scalars: &Vec<Scalar>) -> Vec<LinearCombination> {
     lcs
 }
 
+pub fn scalars_to_bytes_array(scalars: &Vec<Scalar>) -> Vec<u8> {
+    let mut bytes_array: Vec<u8> = Vec::new();
+    for i in 0..scalars.len() {
+        let mut single_scalar_bytes: Vec<u8> = scalars[scalars.len()-i-1].as_bytes().to_vec();
+        remove_zero_padding!(single_scalar_bytes);
+        single_scalar_bytes.reverse();
+        println!("bytes_from_scalar: {:?}", single_scalar_bytes);
+        bytes_array.append(&mut single_scalar_bytes);
+    }
+    bytes_array
+}
+
+pub fn bytes_to_hex_strs(bytes: &Vec<u8>) -> Vec<String> {
+    let mut tmp: Vec<u8> = Vec::new();
+    tmp.extend(bytes);
+    remove_zero_padding!(tmp);
+    let strs: Vec<String> = tmp.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
+    strs
+}
+
+pub fn hex_to_bytes(hex_str: String) -> Option<Vec<u8>> {
+    {
+        (0..hex_str.len())
+        .step_by(2)
+        .map(|i| hex_str.get(i..i + 2)
+        .and_then(|sub| u8::from_str_radix(sub, 16).ok()))
+        .collect()
+    }
+}
+
+fn pad(string: String)-> String {
+    let mut tmp = string.clone();
+    if string.len() % 2 == 1 {
+        tmp = format!("0{}", string);
+    }
+    tmp
+}
+pub fn num_hex_encode(number: u64) -> String {
+    let hex_number: String = format!("{:x}", number);
+    pad(hex_number)
+}
+pub fn str_hex_encode(str: String) -> String {
+    let hex_str: String = hex::encode(str);
+    hex_str
+}
+
+pub fn scalar_to_bytes(scalar: &Scalar) -> Vec<u8> {
+    let mut bytes: Vec<u8> = scalar.as_bytes().to_vec();
+    remove_zero_padding!(bytes);
+    bytes.reverse();
+    bytes
+}
+
+pub fn scalar_to_hex(scalar: &Scalar) -> String {
+    let bytes: Vec<u8> = scalar_to_bytes(scalar);
+    let hex_str: String = bytes_to_hex_strs(&bytes).join("");
+    hex_str
+}
+
+pub fn str_hex_decode(bytes_array: &Vec<u8>) -> String {
+    let decoded = match str::from_utf8(&bytes_array) {
+        Ok(v) => v,
+        Err(e) => "",
+    };
+    String::from(decoded)
+}
+pub fn num_hex_decode(bytes_array: &Vec<u8>) -> u64 {
+    let decoded = be_to_u64(&bytes_array);
+    decoded
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,6 +185,23 @@ mod tests {
         0x29, 0x49, 0xa5, 0x13, 0xde, 0x92, 0xfe, 0x50, 
         0x65, 0x35, 0x0e, 0xbc, 0xd5, 0x1d, 0xb6, 0x04
     ];
+
+    const BYTES_3: [u8; 32] = [
+        0x06, 0x2a, 0xca, 0x04, 0x51, 0xab, 0x15, 0x8b,
+        0x33, 0x78, 0x18, 0xe2, 0x5c, 0x5d, 0x69, 0x06,
+        0x6d, 0xc1, 0x42, 0x1a, 0x56, 0xf1, 0x65, 0x9a,
+        0x55, 0xee, 0x67, 0x32, 0xb8, 0x0c, 0xf9, 0xd7
+    ];
+    const HEX_STR: &str = "062aca0451ab158b337818e25c5d69066dc1421a56f1659a55ee6732b80cf9d7";
+
+    const HEX_8: &str = "5065676779";  // "Peggy"
+    const HEX_9: &str = "50726f766572736f6e";  // "Proverson"
+    const HEX_10: &str = "012fcfd4";    // 019910612
+    const HEX_11: &str = "54696d62756b7475";    // "Timbuktu"
+    const HEX_12: &str = "01337894";    // 020150420
+    const HEX_13: &str = "0134ff33";    // 020250419
+    const HEX_14: &str = "50617373706f7274204f6666696365205a7572696368"; // "Passport Office Zurich"
+    const HEX_15: &str = "82440e";  // 8537102
 
     #[test]
     fn test_le_to_scalars() {
@@ -149,4 +241,106 @@ mod tests {
         assert_eq!(&bytes1, scalars[1].as_bytes());
     }
 
+    #[test]
+    fn test_hex_to_bytes() {
+        let bytes_array: Vec<u8> = hex_to_bytes(String::from(HEX_STR)).unwrap();
+
+        assert_eq!(BYTES_3.to_vec(), bytes_array);
+    }
+    #[test]
+    fn test_scalar_to_bytes() {
+        let scalar: Scalar = be_to_scalar(&BYTES_3.to_vec());
+        let bytes_array: Vec<u8> = scalar_to_bytes(&scalar);
+
+        assert_eq!(BYTES_3.to_vec(), bytes_array);
+    }
+    #[test]
+    fn test_scalar_to_hex() {
+        let scalar: Scalar = be_to_scalar(&BYTES_3.to_vec());
+        let hex_str: String = scalar_to_hex(&scalar);
+
+        assert_eq!(HEX_STR, hex_str);
+    }
+    #[test]
+    fn test_bytes_to_hex() {
+        let bytes_array: Vec<u8> = BYTES_3.to_vec();
+        let hex_str: String = bytes_to_hex_strs(&bytes_array).join("");
+
+        assert_eq!(HEX_STR, hex_str);
+    }
+    #[test]
+    fn test_num_hex_encode() {
+        let hex_hash_10: String = num_hex_encode(19910612);
+        let hex_hash_12: String = num_hex_encode(20150420);
+        let hex_hash_13: String = num_hex_encode(20250419);
+        let hex_hash_15: String = num_hex_encode(8537102);
+
+        assert_eq!(HEX_10, hex_hash_10);
+        assert_eq!(HEX_12, hex_hash_12);
+        assert_eq!(HEX_13, hex_hash_13);
+        assert_eq!(HEX_15, hex_hash_15);
+    }
+    #[test]
+    fn test_str_hex_encode() {
+        let hex_hash_8: String = str_hex_encode(String::from("Peggy"));
+        let hex_hash_9: String = str_hex_encode(String::from("Proverson"));
+        let hex_hash_11: String = str_hex_encode(String::from("Timbuktu"));
+        let hex_hash_14: String = str_hex_encode(String::from("Passport Office Zurich"));
+
+        assert_eq!(HEX_8, hex_hash_8);
+        assert_eq!(HEX_9, hex_hash_9);
+        assert_eq!(HEX_11, hex_hash_11);
+        assert_eq!(HEX_14, hex_hash_14);
+    }
+    #[test]
+    fn test_str_hex_decode() {
+        let bytes_array_8 = hex_to_bytes(String::from(HEX_8)).unwrap();
+        let bytes_array_9 = hex_to_bytes(String::from(HEX_9)).unwrap();
+        let bytes_array_11 = hex_to_bytes(String::from(HEX_11)).unwrap();
+        let bytes_array_14 = hex_to_bytes(String::from(HEX_14)).unwrap();
+
+        let str_value_8 = str_hex_decode(&bytes_array_8);
+        let str_value_9 = str_hex_decode(&bytes_array_9);
+        let str_value_11 = str_hex_decode(&bytes_array_11);
+        let str_value_14 = str_hex_decode(&bytes_array_14);
+
+        assert_eq!("Peggy", str_value_8);
+        assert_eq!("Proverson", str_value_9);
+        assert_eq!("Timbuktu", str_value_11);
+        assert_eq!("Passport Office Zurich", str_value_14);
+    }
+    #[test]
+    fn test_num_hex_decode() {
+        let bytes_array_10 = hex_to_bytes(String::from(HEX_10)).unwrap();
+        let bytes_array_12 = hex_to_bytes(String::from(HEX_12)).unwrap();
+        let bytes_array_13 = hex_to_bytes(String::from(HEX_13)).unwrap();
+        let bytes_array_15 = hex_to_bytes(String::from(HEX_15)).unwrap();
+
+        let int_value_10: u64 = num_hex_decode(&bytes_array_10);
+        let int_value_12: u64 = num_hex_decode(&bytes_array_12);
+        let int_value_13: u64 = num_hex_decode(&bytes_array_13);
+        let int_value_15: u64 = num_hex_decode(&bytes_array_15);
+
+        assert_eq!(19910612, int_value_10);
+        assert_eq!(20150420, int_value_12);
+        assert_eq!(20250419, int_value_13);
+        assert_eq!(8537102, int_value_15);
+    }
+
+    #[test]
+    fn test_wrong_decode_1() {
+        let bytes_array_12 = hex_to_bytes(String::from(HEX_12)).unwrap();
+        let decoded_str = str_hex_decode(&bytes_array_12);
+        assert_eq!("", decoded_str);
+        let decoded_int = num_hex_decode(&bytes_array_12);
+        assert_eq!(20150420, decoded_int);
+
+    }
+    #[test]
+    fn test_wrong_decode_2() {
+        let bytes_array_8 = hex_to_bytes(String::from(HEX_8)).unwrap();
+        let decoded_str = str_hex_decode(&bytes_array_8);
+        assert_ne!("", decoded_str);
+        assert_eq!("Peggy", decoded_str);
+    }
 }

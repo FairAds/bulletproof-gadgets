@@ -11,6 +11,7 @@ use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 use bulletproofs_gadgets::gadget::Gadget;
 use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::MerkleTree256;
+use bulletproofs_gadgets::merkle_root_hash::merkle_root_hash_gadget::MerkleRootHash;
 use bulletproofs_gadgets::bounds_check::bounds_check_gadget::BoundsCheck;
 use bulletproofs_gadgets::mimc_hash::mimc_hash_gadget::MimcHash256;
 use bulletproofs_gadgets::mimc_hash::mimc::mimc_hash;
@@ -132,6 +133,7 @@ fn parse_gadget(
         GadgetOp::LessThan => less_than_gadget(line, assignments, prover, prover_buffer, index, coms_file),
         GadgetOp::Inequality => inequality_gadget(line, assignments, prover, prover_buffer, index, coms_file),
         GadgetOp::SetMembership => set_membership_gadget(line, assignments, prover, prover_buffer, index, coms_file),
+        GadgetOp::MerkleRoot => merkle_root_hash_gadget(line, assignments, prover, prover_buffer, index, coms_file),
         _ => {}
     }
 }
@@ -529,4 +531,38 @@ fn set_membership_gadget(
         
     assignments.cache_derived_wtns(derived_wtns);
     assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
+}
+
+fn merkle_root_hash_gadget(
+    line: &str,
+    assignments: &mut Assignments,
+    prover: &mut Prover,
+    prover_buffer: &mut ProverBuffer,
+    index: usize,
+    coms_file: &mut File
+) {
+    let merkle_parser = gadget_grammar::MerkleRootGadgetParser::new();
+    let (root, instance_vars, witness_vars, pattern) = merkle_parser.parse(line).unwrap();
+
+    let root: LinearCombination = match root {
+        Var::Witness(_) => assignments.get_witness(root, Some(&assert_witness_32)).2[0].into(),
+        Var::Instance(_) => be_to_scalar(&assignments.get_instance(root, Some(&assert_32))).into(),
+        _ => panic!("invalid state")
+    };
+
+    let instance_vars: Vec<LinearCombination> = instance_vars.into_iter()
+        .map(|var| mimc_hash(&assignments.get_instance(var.clone(), None)).into()).collect();
+
+    let mut hash_number = 0;
+    let mut witness_scalars: Vec<LinearCombination> = Vec::new();
+
+    for witness_var in witness_vars {
+        let (scalar, var) = hash_witness(prover, prover_buffer, witness_var, assignments, index, hash_number, coms_file);
+        hash_number += 1;
+        witness_scalars.push(scalar.into());
+    }
+
+    let gadget = MerkleRootHash::new(root, Vec::new(), Vec::new(), pattern.clone());
+
+    gadget.prove(prover_buffer, &Vec::new(), &Vec::new());
 }

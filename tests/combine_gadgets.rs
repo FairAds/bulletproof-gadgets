@@ -17,6 +17,7 @@ use bulletproofs_gadgets::gadget::Gadget;
 use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::{MerkleTree256, Pattern, Pattern::*};
 use bulletproofs_gadgets::bounds_check::bounds_check_gadget::BoundsCheck;
 use bulletproofs_gadgets::mimc_hash::mimc_hash_gadget::MimcHash256;
+use bulletproofs_gadgets::merkle_root_hash::merkle_root_hash_gadget::MerkleRootHash;
 use bulletproofs_gadgets::conversions::be_to_scalar;
 
 #[test]
@@ -77,6 +78,10 @@ fn test_combine_gadgets() {
     let p_merkle = MerkleTree256::new(root.into(), vec![be_to_scalar(&merkle_leaf).into()], vec![w2_var.into()], pattern.clone());
     p_merkle.prove(&mut prover, &Vec::new(), &Vec::new());
 
+    // ---------- MERKLE ROOT  ----------
+    let p_root = MerkleRootHash::new(Scalar::zero().into(), Vec::new(), Vec::new(), pattern.clone()); // Empty input
+    p_root.prove(&mut prover, &Vec::new(), &Vec::new());
+
     // ---------- CREATE PROOF ----------
     let proof = prover.prove(&p_bp_gens).unwrap();
 
@@ -101,6 +106,11 @@ fn test_combine_gadgets() {
     let v_merkle = MerkleTree256::new(root.into(), vec![be_to_scalar(&merkle_leaf).into()], vec![witness_vars[1].into()], pattern.clone());
     let _ = verifier_commit(&mut verifier, Vec::new());
     v_merkle.verify(&mut verifier, &Vec::new(), &Vec::new());
+
+    // ---------- MERKLE ROOT  ----------
+    let v_root = MerkleRootHash::new(Scalar::zero().into(), Vec::new(), Vec::new(), pattern.clone()); // Empty input
+    let _ = verifier_commit(&mut verifier, Vec::new());
+    v_root.verify(&mut verifier, &Vec::new(), &Vec::new());
 
     // ---------- VERIFY PROOF ----------
     assert!(verifier.verify(&proof, &v_pc_gens, &v_bp_gens).is_ok());

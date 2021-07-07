@@ -13,6 +13,7 @@ pub enum GadgetOp {
     CodeBlockEnd,
     SetMembership,
     CodeBlockStart,
+    MerkleRoot,
 }
 
 #[derive(Clone)]
@@ -37,7 +38,8 @@ impl GadgetOp {
             GadgetOp::CodeBlockStart => "{",
             GadgetOp::LessThan => "LESS_THAN",
             GadgetOp::Inequality => "UNEQUAL",
-            GadgetOp::SetMembership => "SET_MEMBER"
+            GadgetOp::SetMembership => "SET_MEMBER",
+            GadgetOp::MerkleRoot => "ROOT"
         }
     }
 
@@ -80,6 +82,7 @@ impl FromStr for GadgetOp {
             "UNEQUAL" => Ok(GadgetOp::Inequality),
             "LESS_THAN" => Ok(GadgetOp::LessThan),
             "SET_MEMBER" => Ok(GadgetOp::SetMembership),
+            "ROOT" => Ok(GadgetOp::MerkleRoot),
             _ => Err(()),
         }
     }

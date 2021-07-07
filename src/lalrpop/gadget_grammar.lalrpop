@@ -43,6 +43,17 @@ pub MerkleGadget: (Var, Vec<Var>, Vec<Var>, Pattern) = {
     }
 }
 
+pub MerkleRootGadget: (Var, Vec<Var>, Vec<Var>, Pattern) = {
+    "ROOT" <root:Instance> <tree:Tree> => {
+        let (instance_vars, witness_vars, pattern) = tree;
+        (Instance(root), instance_vars, witness_vars, pattern)
+    },
+    "ROOT" <root:Witness> <tree:Tree> => {
+        let (instance_vars, witness_vars, pattern) = tree;
+        (Witness(root), instance_vars, witness_vars, pattern)
+    }
+}
+
 Tree: (Vec<Var>, Vec<Var>, Pattern) = {
     "("<t1:Tree> <t2:Tree>")" => {
         let (i1, w1, p1) = t1; 
