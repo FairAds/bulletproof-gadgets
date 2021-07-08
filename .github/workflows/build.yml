@@ -7,11 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Install nightly 2019-10-26
+      - name: Install nightly 2020-08-20
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2019-10-26
+          toolchain: nightly-2020-08-20
           override: true
+          profile: minimal
+          default: true
       - name: Build
         run: cargo build --verbose
       - name: Run tests
