@@ -47,9 +47,9 @@ jobs:
         cargo run --release --bin prover tests/resources/set_membership
         cargo run --release --bin verifier tests/resources/set_membership
     - name: Test merkle_root
-        run: |
-          cargo run --release --bin prover tests/resources/merkle_root
-          cargo run --release --bin verifier tests/resources/merkle_root
+      run: |
+        cargo run --release --bin prover tests/resources/merkle_root
+        cargo run --release --bin verifier tests/resources/merkle_root
     - name: Test or_conjunction
       run: |
         cargo run --release --bin prover tests/resources/or
