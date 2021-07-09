@@ -57,7 +57,7 @@ fn mimc_sponge_2(
     key
 }
 
-/// MiMCHash-256b, rate = 256, capacity = 513
+/// MiMCHash-256b, rate = 256, capacity = 513   (Accepts single byte vector as input)
 pub fn mimc_hash(preimage: &Vec<u8>) -> Scalar {
     let mut preimage: Vec<Scalar> = be_to_scalars(preimage);
     pad(&mut preimage); // apply PKCS#7 padding
@@ -75,7 +75,7 @@ pub fn mimc_hash(preimage: &Vec<u8>) -> Scalar {
 }
 
 
-/// MiMCHash-256b, rate = 256, capacity = 513
+/// MiMCHash-256b, rate = 256, capacity = 513 (Accepts an scalars vector as input)
 pub fn mimc_hash_sponge(preimage: &Vec<Scalar>) -> Scalar {
     let mut padded_preimage: Vec<Scalar> = preimage.clone();
 

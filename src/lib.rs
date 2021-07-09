@@ -1,6 +1,8 @@
 #![feature(box_syntax, box_patterns)]
 #![allow(unused_parens)]
-#![allow(non_fmt_panic)]
+#![allow(non_snake_case)]
+#![allow(non_fmt_panics)]
+
 //------------------------------------------------------------------------
 // External dependencies
 //------------------------------------------------------------------------

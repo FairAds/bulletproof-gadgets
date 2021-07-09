@@ -94,18 +94,7 @@ pub fn scalars_to_lc(scalars: &Vec<Scalar>) -> Vec<LinearCombination> {
     lcs
 }
 
-pub fn scalars_to_bytes_array(scalars: &Vec<Scalar>) -> Vec<u8> {
-    let mut bytes_array: Vec<u8> = Vec::new();
-    for i in 0..scalars.len() {
-        let mut single_scalar_bytes: Vec<u8> = scalars[scalars.len()-i-1].as_bytes().to_vec();
-        remove_zero_padding!(single_scalar_bytes);
-        single_scalar_bytes.reverse();
-        println!("bytes_from_scalar: {:?}", single_scalar_bytes);
-        bytes_array.append(&mut single_scalar_bytes);
-    }
-    bytes_array
-}
-
+/// Transforms the given byte vector to a vector of hexadecimal String bytes.
 pub fn bytes_to_hex_strs(bytes: &Vec<u8>) -> Vec<String> {
     let mut tmp: Vec<u8> = Vec::new();
     tmp.extend(bytes);
@@ -115,7 +104,7 @@ pub fn bytes_to_hex_strs(bytes: &Vec<u8>) -> Vec<String> {
         .collect();
     strs
 }
-
+/// Transforms a hex literal with even length to a byte vector.
 pub fn hex_to_bytes(hex_str: String) -> Option<Vec<u8>> {
     {
         (0..hex_str.len())
@@ -133,15 +122,19 @@ fn pad(string: String)-> String {
     }
     tmp
 }
+/// Encodes an integer to a lowercase hex literal String (does not include 0x prefix).
+/// If the resulting length is uneven, pads one zero to the left.
 pub fn num_hex_encode(number: u64) -> String {
     let hex_number: String = format!("{:x}", number);
     pad(hex_number)
 }
+/// Encodes a String to a lowercase hex literal String (does not include 0x prefix).
 pub fn str_hex_encode(str: String) -> String {
     let hex_str: String = hex::encode(str);
     hex_str
 }
 
+/// Returns the byte vector in big endian order from the given Scalar, removing the zero padding.
 pub fn scalar_to_bytes(scalar: &Scalar) -> Vec<u8> {
     let mut bytes: Vec<u8> = scalar.as_bytes().to_vec();
     remove_zero_padding!(bytes);
@@ -149,19 +142,23 @@ pub fn scalar_to_bytes(scalar: &Scalar) -> Vec<u8> {
     bytes
 }
 
+/// Returns the hex literal form of the Scalar.
 pub fn scalar_to_hex(scalar: &Scalar) -> String {
     let bytes: Vec<u8> = scalar_to_bytes(scalar);
     let hex_str: String = bytes_to_hex_strs(&bytes).join("");
     hex_str
 }
 
+/// Decodes a String from the given byte vector assuming UTF-8 encoding. Returns "" when decoding fails.
 pub fn str_hex_decode(bytes_array: &Vec<u8>) -> String {
     let decoded = match str::from_utf8(&bytes_array) {
         Ok(v) => v,
-        Err(e) => "",
+        Err(_e) => "",
     };
     String::from(decoded)
 }
+
+/// Decodes an integer value from the given byte vector in big endian order
 pub fn num_hex_decode(bytes_array: &Vec<u8>) -> u64 {
     let decoded = be_to_u64(&bytes_array);
     decoded

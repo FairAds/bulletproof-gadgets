@@ -2,10 +2,10 @@ extern crate curve25519_dalek;
 extern crate bulletproofs;
 extern crate hex;
 
-#[macro_use] extern crate bulletproofs_gadgets;
+extern crate bulletproofs_gadgets;
 use curve25519_dalek::scalar::Scalar;
-use bulletproofs_gadgets::mimc_hash::mimc::{mimc_hash, mimc_hash_sponge};
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, scalar_to_be, be_to_u64, str_hex_encode, num_hex_encode, hex_to_bytes, scalar_to_hex, scalar_to_bytes, bytes_to_hex_strs};
+use bulletproofs_gadgets::mimc_hash::mimc::{mimc_hash_sponge};
+use bulletproofs_gadgets::conversions::{be_to_scalars, str_hex_encode, num_hex_encode, hex_to_bytes, scalar_to_hex};
 
 const HEX_8: &str = "5065676779";  // "Peggy"
 const HEX_9: &str = "50726f766572736f6e";  // "Proverson"
@@ -16,25 +16,45 @@ const HEX_13: &str = "0134ff33";    // 020250419
 const HEX_14: &str = "50617373706f7274204f6666696365205a7572696368"; // "Passport Office Zurich"
 const HEX_15: &str = "82440e";  // 8537102
 
-const first_name: &str = "Peggy";
-const last_name: &str = "Proverson";
-const date_of_birth: u64 = 19910612;
-const place_of_origin: &str = "Timbuktu";
-const date_of_issue: u64 = 20150420;
-const date_of_expiry: u64 = 20250419;
-const authority: &str = "Passport Office Zurich";
-const identifier: u64 = 8537102;
+const FIRST_NAME: &str = "Peggy";
+const LAST_NAME: &str = "Proverson";
+const DATE_OF_BIRTH: u64 = 19910612;
+const PLACE_OF_ORIGIN: &str = "Timbuktu";
+const DATE_OF_ISSUE: u64 = 20150420;
+const DATE_OF_EXPIRY: u64 = 20250419;
+const AUTHORITY: &str = "Passport Office Zurich";
+const IDENTIFIER: u64 = 8537102;
 
 fn mimc_hash_calculations() {
 
-    let first_name_hex = str_hex_encode(first_name.into());
-    let last_name_hex = str_hex_encode(last_name.into());
-    let date_of_birth_hex = num_hex_encode(date_of_birth);
-    let place_of_origin_hex = str_hex_encode(place_of_origin.into());
-    let date_of_issue_hex = num_hex_encode(date_of_issue);
-    let date_of_expiry_hex = num_hex_encode(date_of_expiry);
-    let authority_hex = str_hex_encode(authority.into());
-    let identifier_hex = num_hex_encode(identifier);
+    println!("\nFields:\n");
+    println!("  first_name: {:?}", FIRST_NAME);
+    println!("  last_name: {:?}", LAST_NAME);
+    println!("  date_of_birth: {:?}", DATE_OF_BIRTH);
+    println!("  place_of_origin: {:?}", PLACE_OF_ORIGIN);
+    println!("  date_of_issue: {:?}", DATE_OF_ISSUE);
+    println!("  date_of_expiry: {:?}", DATE_OF_EXPIRY);
+    println!("  authority: {:?}", AUTHORITY);
+    println!("  identifier: {:?}", IDENTIFIER);
+    println!("\n----------------------------\n");
+
+    let first_name_hex = str_hex_encode(FIRST_NAME.into());
+    let last_name_hex = str_hex_encode(LAST_NAME.into());
+    let date_of_birth_hex = num_hex_encode(DATE_OF_BIRTH);
+    let place_of_origin_hex = str_hex_encode(PLACE_OF_ORIGIN.into());
+    let date_of_issue_hex = num_hex_encode(DATE_OF_ISSUE);
+    let date_of_expiry_hex = num_hex_encode(DATE_OF_EXPIRY);
+    let authority_hex = str_hex_encode(AUTHORITY.into());
+    let identifier_hex = num_hex_encode(IDENTIFIER);
+
+    assert_eq!(HEX_8, first_name_hex);
+    assert_eq!(HEX_9, last_name_hex);
+    assert_eq!(HEX_10, date_of_birth_hex);
+    assert_eq!(HEX_11, place_of_origin_hex);
+    assert_eq!(HEX_12, date_of_issue_hex);
+    assert_eq!(HEX_13, date_of_expiry_hex);
+    assert_eq!(HEX_14, authority_hex);
+    assert_eq!(HEX_15, identifier_hex);
 
     println!("\nHexLiterals:\n");
     println!("  first_name: {:?}", first_name_hex);
@@ -48,14 +68,14 @@ fn mimc_hash_calculations() {
     println!("\n----------------------------\n");
 
     // 1. Convert Hex Literal to Bytes array
-    let mut first_name_bytes: Vec<u8> = hex_to_bytes(first_name_hex).unwrap();
-    let mut last_name_bytes: Vec<u8> = hex_to_bytes(last_name_hex).unwrap();
-    let mut date_of_birth_bytes: Vec<u8> = hex_to_bytes(date_of_birth_hex).unwrap();
-    let mut place_of_origin_bytes: Vec<u8> = hex_to_bytes(place_of_origin_hex).unwrap();
-    let mut date_of_issue_bytes: Vec<u8> = hex_to_bytes(date_of_issue_hex).unwrap();
-    let mut date_of_expiry_bytes: Vec<u8> = hex_to_bytes(date_of_expiry_hex).unwrap();
-    let mut authority_bytes: Vec<u8> = hex_to_bytes(authority_hex).unwrap();
-    let mut identifier_bytes: Vec<u8> = hex_to_bytes(identifier_hex).unwrap();
+    let first_name_bytes: Vec<u8> = hex_to_bytes(first_name_hex).unwrap();
+    let last_name_bytes: Vec<u8> = hex_to_bytes(last_name_hex).unwrap();
+    let date_of_birth_bytes: Vec<u8> = hex_to_bytes(date_of_birth_hex).unwrap();
+    let place_of_origin_bytes: Vec<u8> = hex_to_bytes(place_of_origin_hex).unwrap();
+    let date_of_issue_bytes: Vec<u8> = hex_to_bytes(date_of_issue_hex).unwrap();
+    let date_of_expiry_bytes: Vec<u8> = hex_to_bytes(date_of_expiry_hex).unwrap();
+    let authority_bytes: Vec<u8> = hex_to_bytes(authority_hex).unwrap();
+    let identifier_bytes: Vec<u8> = hex_to_bytes(identifier_hex).unwrap();
 
     println!("Bytes:\n");
     println!("  first_name: {:?}", first_name_bytes);
@@ -110,14 +130,14 @@ fn mimc_hash_calculations() {
     println!("\n----------------------------\n");
 
     println!("MiMC Hash (HexLiterals):\n");
-    println!("  first_name ('{}'): 0x{}",first_name, scalar_to_hex(&first_name_image));
-    println!("  last_name ('{}'): 0x{}",last_name, scalar_to_hex(&last_name_image));
-    println!("  date_of_birth ({}): 0x{}",date_of_birth, scalar_to_hex(&date_of_birth_image));
-    println!("  place_of_origin ('{}'): 0x{}",place_of_origin, scalar_to_hex(&place_of_origin_image));
-    println!("  date_of_issue ({}): 0x{}",date_of_issue, scalar_to_hex(&date_of_issue_image));
-    println!("  date_of_expiry ({}): 0x{}",date_of_expiry, scalar_to_hex(&date_of_expiry_image));
-    println!("  authority ('{}'): 0x{}",authority, scalar_to_hex(&authority_image));
-    println!("  identifier ({}): 0x{}",identifier, scalar_to_hex(&identifier_image));
+    println!("  first_name ('{}'): 0x{}", FIRST_NAME, scalar_to_hex(&first_name_image));
+    println!("  last_name ('{}'): 0x{}", LAST_NAME, scalar_to_hex(&last_name_image));
+    println!("  date_of_birth ({}): 0x{}", DATE_OF_BIRTH, scalar_to_hex(&date_of_birth_image));
+    println!("  place_of_origin ('{}'): 0x{}", PLACE_OF_ORIGIN, scalar_to_hex(&place_of_origin_image));
+    println!("  date_of_issue ({}): 0x{}", DATE_OF_ISSUE, scalar_to_hex(&date_of_issue_image));
+    println!("  date_of_expiry ({}): 0x{}", DATE_OF_EXPIRY, scalar_to_hex(&date_of_expiry_image));
+    println!("  authority ('{}'): 0x{}", AUTHORITY, scalar_to_hex(&authority_image));
+    println!("  identifier ({}): 0x{}", IDENTIFIER, scalar_to_hex(&identifier_image));
     println!("\n----------------------------\n");
 }
 

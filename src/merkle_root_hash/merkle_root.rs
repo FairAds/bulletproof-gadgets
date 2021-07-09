@@ -25,7 +25,7 @@ impl MerkleRoot {
         println!("---------------");
         let preimage: Vec<Scalar>;
         let patt = pattern.clone();
-        println!("PATTERN = {}", patt);
+        println!("MerkleTreePattern = {}", patt);
         match pattern {
             Pattern::Hash(left @ box Pattern::Hash(_,_), box Pattern::W) =>
                 preimage = vec![self.parse_merkle_tree( w_vars, i_vars, *left, index), self.next_val(w_vars)],
@@ -50,7 +50,7 @@ impl MerkleRoot {
         }
         println!("Parse call index = {}", &index);
         *index = *index +1;
-        println!("Preimage: [");
+        println!("Preimage(decoded): [");
         for p in preimage.iter(){
             let bytes_array = scalar_to_bytes(&p);
             let decoded_str = str_hex_decode(&bytes_array);
@@ -75,8 +75,8 @@ impl MerkleRoot {
 
     pub fn calculate_merkle_root(
         &mut self,
-        w_vars: Vec<Scalar>,
-        i_vars: Vec<Scalar>,
+        w_vars: &Vec<Scalar>,
+        i_vars: &Vec<Scalar>,
         pattern: Pattern
     ){
         let mut w_values: Vec<Scalar> = w_vars.clone();

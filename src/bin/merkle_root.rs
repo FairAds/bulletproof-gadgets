@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+#![allow(dead_code)]
 extern crate curve25519_dalek;
 extern crate bulletproofs;
 extern crate hex;
@@ -5,25 +7,12 @@ extern crate hex;
 #[macro_use] extern crate bulletproofs_gadgets;
 use curve25519_dalek::scalar::Scalar;
 use bulletproofs_gadgets::merkle_root_hash::merkle_root::MerkleRoot;
-use bulletproofs_gadgets::mimc_hash::mimc::mimc_hash_sponge;
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, scalar_to_be, be_to_u64, str_hex_encode, num_hex_encode, hex_to_bytes, scalar_to_hex, scalar_to_bytes, bytes_to_hex_strs};
+use bulletproofs_gadgets::mimc_hash::mimc::{mimc_hash_sponge};
+use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, hex_to_bytes, scalar_to_hex, scalar_to_bytes, bytes_to_hex_strs};
 use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::{Pattern, Pattern::*};
 
-// MERKLE I1 (((W0 W1) (W2 W3)) ((W4 W5) (W6 W7)))
-
-/* These values come from zkStrata java conversion form .json values to Hex Literals.
-W0 = 0x5065676779;  // (firstName: "Peggy") -> String.toHex()
-W1 = 0x50726f766572736f6e;  // (lastName: "Proverson") -> String.toHex()
-W2 = 0x012fcfd4;    // (dateOfBirth: 19910612)  -> pad 0 left + String.format("%x", int)
-W3 = 0x54696d62756b7475;    // (placeOfOrigin: "Timbuktu") -> String.toHex()
-W4 = 0x01337894;    // (dateOfIssue: 20150420) -> pad 0 left + String.format("%x", int)
-W5 = 0x0134ff33;    // (dateOfExpiry: 20250419) -> pad 0 left + String.format("%x", int)
-W6 = 0x50617373706f7274204f6666696365205a7572696368;    // (authority: "Passport Office Zurich") -> String.toHex()
-W7 = 0x82440e;  // (identifier: 8537102) -> String.format("%x", int)
-*/
-
-const HEX_8: &str = "5065676779";  // "Peggy"
-const HEX_9: &str = "50726f766572736f6e";  // "Proverson"
+const HEX_8:  &str = "5065676779";  // "Peggy"
+const HEX_9:  &str = "50726f766572736f6e";  // "Proverson"
 const HEX_10: &str = "012fcfd4";    // 019910612
 const HEX_11: &str = "54696d62756b7475";    // "Timbuktu"
 const HEX_12: &str = "01337894";    // 020150420
@@ -31,49 +20,27 @@ const HEX_13: &str = "0134ff33";    // 020250419
 const HEX_14: &str = "50617373706f7274204f6666696365205a7572696368"; // "Passport Office Zurich"
 const HEX_15: &str = "82440e";  // 8537102
 
+// The "original" merkle root hash of the Passport Example
+// const MERKLE_ROOT_HASH: &str = "06b131554e4e50b52e096971533411c7623504f6a56edf1bccdc810672efdd22";
 
-fn hard_coded_passport_hash_calcs() {
-    let first_name: String = String::from("Peggy");
-    let last_name: String = String::from("Proverson");
-    let date_of_birth = 19910612;
-    let place_of_origin: String = String::from("Timbuktu");
-    let date_of_issue = 20150420;
-    let date_of_expiry = 20250419;
-    let authority = String::from("Passport Office Zurich");
-    let identifier = 8537102;
-    // The "GOAL" root hash...
-    let root_hash_hex: String = String::from("06b131554e4e50b52e096971533411c7623504f6a56edf1bccdc810672efdd22");
 
-    /*
-    *    Conversion from values (int/string) to hex -> bytes -> Scalars
-    */
+fn direct_merkle_tree_pattern_hashing_calcs() {
+    //                   1
+    //                  / \
+    //         2                  3
+    //        / \                / \
+    //     4        5        6        7
+    //    / \      / \      / \      / \
+    //   8   9   10   11  12   13  14   15
 
-    let hex_first_name = str_hex_encode(first_name);
-    let hex_last_name = str_hex_encode(last_name);
-    let hex_date_of_birth = num_hex_encode(date_of_birth);
-    let hex_place_of_origin = str_hex_encode(place_of_origin);
-    let hex_date_of_issue = num_hex_encode(date_of_issue);
-    let hex_date_of_expiry = num_hex_encode(date_of_expiry);
-    let hex_authority = str_hex_encode(authority);
-    let hex_identifier = num_hex_encode(identifier);
-
-    assert_eq!(hex_date_of_birth, "012fcfd4");
-        //                   1
-        //                  / \
-        //         2                  3
-        //        / \                / \
-        //     4        5        6        7
-        //    / \      / \      / \      / \
-        //   8   9   10   11  12   13  14   15
-
-    let mut W8: Vec<u8> = hex_to_bytes(hex_first_name).unwrap();
-    let mut W9: Vec<u8> = hex_to_bytes(hex_last_name).unwrap();
-    let mut W10: Vec<u8> = hex_to_bytes(hex_date_of_birth).unwrap();
-    let mut W11: Vec<u8> = hex_to_bytes(hex_place_of_origin).unwrap();
-    let mut W12: Vec<u8> = hex_to_bytes(hex_date_of_issue).unwrap();
-    let mut W13: Vec<u8> = hex_to_bytes(hex_date_of_expiry).unwrap();
-    let mut W14: Vec<u8> = hex_to_bytes(hex_authority).unwrap();
-    let mut W15: Vec<u8> = hex_to_bytes(hex_identifier).unwrap();
+    let W8: Vec<u8> = hex_to_bytes(HEX_8.into()).unwrap();
+    let W9: Vec<u8> = hex_to_bytes(HEX_9.into()).unwrap();
+    let W10: Vec<u8> = hex_to_bytes(HEX_10.into()).unwrap();
+    let W11: Vec<u8> = hex_to_bytes(HEX_11.into()).unwrap();
+    let W12: Vec<u8> = hex_to_bytes(HEX_12.into()).unwrap();
+    let W13: Vec<u8> = hex_to_bytes(HEX_13.into()).unwrap();
+    let W14: Vec<u8> = hex_to_bytes(HEX_14.into()).unwrap();
+    let W15: Vec<u8> = hex_to_bytes(HEX_15.into()).unwrap();
     println!("W8: {:?}", W8);
     println!("W9: {:?}", W9);
     println!("W10: {:?}", W10);
@@ -111,23 +78,23 @@ fn hard_coded_passport_hash_calcs() {
     println!("W14_hex: 0x{}", scalar_to_hex(&hash_W14));
     println!("W15_hex: 0x{}", scalar_to_hex(&hash_W15));
 
-    let mut W4: Vec<Scalar> = vec![ be_to_scalar(&W8.to_vec()),  be_to_scalar(&W9.to_vec())];
-    let mut W5: Vec<Scalar> = vec![ be_to_scalar(&W10.to_vec()),  be_to_scalar(&W11.to_vec())];
-    let mut W6: Vec<Scalar> = vec![ be_to_scalar(&W12.to_vec()),  be_to_scalar(&W13.to_vec())];
-    let mut W7: Vec<Scalar> = vec![ be_to_scalar(&W14.to_vec()),  be_to_scalar(&W15.to_vec())];
+    let W4: Vec<Scalar> = vec![ be_to_scalar(&W8.to_vec()),  be_to_scalar(&W9.to_vec())];
+    let W5: Vec<Scalar> = vec![ be_to_scalar(&W10.to_vec()),  be_to_scalar(&W11.to_vec())];
+    let W6: Vec<Scalar> = vec![ be_to_scalar(&W12.to_vec()),  be_to_scalar(&W13.to_vec())];
+    let W7: Vec<Scalar> = vec![ be_to_scalar(&W14.to_vec()),  be_to_scalar(&W15.to_vec())];
 
     let hash_W4 = mimc_hash_sponge(&W4);
     let hash_W5 = mimc_hash_sponge(&W5);
     let hash_W6 = mimc_hash_sponge(&W6);
     let hash_W7 = mimc_hash_sponge(&W7);
 
-    let mut W2: Vec<Scalar> = vec![hash_W4, hash_W5];
-    let mut W3: Vec<Scalar> = vec![hash_W6, hash_W7];
+    let W2: Vec<Scalar> = vec![hash_W4, hash_W5];
+    let W3: Vec<Scalar> = vec![hash_W6, hash_W7];
 
     let hash_W2 = mimc_hash_sponge(&W2);
     let hash_W3 = mimc_hash_sponge(&W3);
 
-    let mut W1: Vec<Scalar> = vec![hash_W2, hash_W3];
+    let W1: Vec<Scalar> = vec![hash_W2, hash_W3];
 
     let hash_W1 = mimc_hash_sponge(&W1);
 
@@ -176,8 +143,46 @@ fn hard_coded_passport_hash_calcs() {
 
 }
 
+fn merkle_root_calculation_for_combine_gadgets_test(){
+     let image: Vec<u8> = vec![
+        0x0c, 0xfb, 0x0c, 0x17, 0x61, 0x82, 0x11, 0xc6,
+        0x07, 0xfe, 0xbf, 0x70, 0x3a, 0xc3, 0xf3, 0x07,
+        0x8f, 0x7d, 0x96, 0x79, 0x8f, 0xae, 0x9d, 0x4a,
+        0x16, 0x82, 0xbc, 0x59, 0x2f, 0x7c, 0xb1, 0x26
+    ]; // W2
+     let root: Scalar = be_to_scalar(&vec![
+        0x0c, 0x8c, 0x87, 0xb6, 0x48, 0xe8, 0xfa, 0x0d,
+        0x97, 0x26, 0xee, 0x82, 0x25, 0xbe, 0x06, 0x28,
+        0x79, 0x4f, 0x2e, 0x1d, 0x1a, 0xb9, 0x32, 0x42,
+        0x1d, 0x45, 0x85, 0x1a, 0x35, 0xd8, 0x1a, 0xc1
+    ]); // I1
+    let merkle_leaf: Vec<u8> = vec![
+        0x09, 0x24, 0x33, 0x33, 0xe3, 0x74, 0xe7, 0x6e,
+        0x49, 0x75, 0xab, 0x48, 0xae, 0x38, 0x24, 0x1b,
+        0xa6, 0x78, 0x05, 0xcd, 0x60, 0xf1, 0x52, 0x3e,
+        0x9b, 0x79, 0xa4, 0x8d, 0xaa, 0xc9, 0xa8, 0x4d
+    ]; // I2
+    let w_vars: Vec<Scalar> = vec![
+        mimc_hash_sponge(&vec![be_to_scalar(&image)]),
+    ];
+    let i_vars: Vec<Scalar> = vec![
+        mimc_hash_sponge(&vec![be_to_scalar(&merkle_leaf)]),
+    ];
+    println!("W2: 0x{}", bytes_to_hex_strs(&image).join(""));
+    println!("I2: 0x{}", bytes_to_hex_strs(&merkle_leaf).join(""));
+    let pattern: Pattern = hash!(W, I);
 
-fn merkle_root_calculation() {
+    let mut root_calculator = MerkleRoot::new();
+    root_calculator.calculate_merkle_root(&w_vars, &i_vars, pattern.clone());
+    let root2 = root_calculator.get_merkle_root_scalar();
+    println!("ROOT: 0x{}", scalar_to_hex(&root));
+    println!("ROOT2: 0x{}", scalar_to_hex(&root2));
+    let bytes = bytes_to_hex_strs(&scalar_to_bytes(&root2));
+    let hex_bytes: Vec<String> = bytes.iter().map(|x| format!("0x{}",x)).collect();
+    println!("ROOT2 bytes: {:?}", hex_bytes);
+
+}
+fn merkle_root_calculation_passport_example() {
 
     //                   1
     //                  / \
@@ -187,36 +192,37 @@ fn merkle_root_calculation() {
     //    / \      / \      / \      / \
     //   8   9   10   11  12   13  14   15
 
-    let mut W8: Vec<u8> = hex_to_bytes(String::from(HEX_8)).unwrap();
-    let mut W9: Vec<u8> = hex_to_bytes(String::from(HEX_9)).unwrap();
-    let mut W10: Vec<u8> = hex_to_bytes(String::from(HEX_10)).unwrap();
-    let mut W11: Vec<u8> = hex_to_bytes(String::from(HEX_11)).unwrap();
-    let mut W12: Vec<u8> = hex_to_bytes(String::from(HEX_12)).unwrap();
-    let mut W13: Vec<u8> = hex_to_bytes(String::from(HEX_13)).unwrap();
-    let mut W14: Vec<u8> = hex_to_bytes(String::from(HEX_14)).unwrap();
-    let mut W15: Vec<u8> = hex_to_bytes(String::from(HEX_15)).unwrap();
+    let W8: Vec<u8> = hex_to_bytes(String::from(HEX_8)).unwrap();
+    let W9: Vec<u8> = hex_to_bytes(String::from(HEX_9)).unwrap();
+    let W10: Vec<u8> = hex_to_bytes(String::from(HEX_10)).unwrap();
+    let W11: Vec<u8> = hex_to_bytes(String::from(HEX_11)).unwrap();
+    let W12: Vec<u8> = hex_to_bytes(String::from(HEX_12)).unwrap();
+    let W13: Vec<u8> = hex_to_bytes(String::from(HEX_13)).unwrap();
+    let W14: Vec<u8> = hex_to_bytes(String::from(HEX_14)).unwrap();
+    let W15: Vec<u8> = hex_to_bytes(String::from(HEX_15)).unwrap();
 
     let pattern: Pattern = hash!(hash!(hash!(W, W), hash!(W, W)), hash!(hash!(W, W), hash!(W, W)));
 
     let w_vars: Vec<Scalar> = vec![
-        be_to_scalar(&W8.to_vec()),
-        be_to_scalar(&W9.to_vec()),
-        be_to_scalar(&W10.to_vec()),
-        be_to_scalar(&W11.to_vec()),
-        be_to_scalar(&W12.to_vec()),
-        be_to_scalar(&W13.to_vec()),
-        be_to_scalar(&W14.to_vec()),
-        be_to_scalar(&W15.to_vec()),
+        be_to_scalar(&W8),
+        be_to_scalar(&W9),
+        be_to_scalar(&W10),
+        be_to_scalar(&W11),
+        be_to_scalar(&W12),
+        be_to_scalar(&W13),
+        be_to_scalar(&W14),
+        be_to_scalar(&W15),
     ];
 
 
     let mut root_calculator = MerkleRoot::new();
-    root_calculator.calculate_merkle_root(w_vars, Vec::new(), pattern);
-    println!("{}", root_calculator.get_merkle_root_hash());
+    root_calculator.calculate_merkle_root(&w_vars, &Vec::new(), pattern);
+    println!("Merkle Root hash: {}", root_calculator.get_merkle_root_hash());
 }
 fn main() -> std::io::Result<()> {
-    //hard_coded_passport_hash_calcs();
-    merkle_root_calculation();
+    //direct_merkle_tree_pattern_hashing_calcs();
+    //merkle_root_calculation_for_combine_gadgets_test();
+    merkle_root_calculation_passport_example();
     Ok(())
 }
 

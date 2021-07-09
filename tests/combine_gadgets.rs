@@ -38,7 +38,7 @@ fn test_combine_gadgets() {
         0x8f, 0x7d, 0x96, 0x79, 0x8f, 0xae, 0x9d, 0x4a, 
         0x16, 0x82, 0xbc, 0x59, 0x2f, 0x7c, 0xb1, 0x26
     ]; // W2
-    let (_, w2_commitment, w2_var) = commit_single(&mut prover, &image);
+    let (w2_scalar, w2_commitment, w2_var) = commit_single(&mut prover, &image);
 
     let mut witness_commitments: Vec<CompressedRistretto> = Vec::new();
     witness_commitments.push(w1_commitment[0].clone());
@@ -79,8 +79,16 @@ fn test_combine_gadgets() {
     p_merkle.prove(&mut prover, &Vec::new(), &Vec::new());
 
     // ---------- MERKLE ROOT  ----------
-    let p_root = MerkleRootHash::new(Scalar::zero().into(), Vec::new(), Vec::new(), pattern.clone()); // Empty input
-    p_root.prove(&mut prover, &Vec::new(), &Vec::new());
+    let root2: Scalar = be_to_scalar(&vec![
+        0x01, 0x43, 0xc0, 0xa4, 0x59, 0xaa, 0x52, 0x7a,
+        0x5b, 0xd3, 0xbc, 0x48, 0x7a, 0x90, 0x05, 0x66,
+        0xb3, 0x95, 0xa4, 0xde, 0x0f, 0xbb, 0x4f, 0xfa,
+        0x92, 0xf8, 0xc2, 0xfb, 0xf6, 0xcc, 0x51, 0x0d
+    ]);
+    let p_root = MerkleRootHash::new(root2.into(),vec![be_to_scalar(&merkle_leaf).into()],  pattern.clone());
+    let (derived_commitments, derived_witnesses) = p_root.setup(&mut prover, &vec![w2_scalar.into()]);
+
+    p_root.prove(&mut prover, &Vec::new(), &derived_witnesses);
 
     // ---------- CREATE PROOF ----------
     let proof = prover.prove(&p_bp_gens).unwrap();
@@ -108,9 +116,10 @@ fn test_combine_gadgets() {
     v_merkle.verify(&mut verifier, &Vec::new(), &Vec::new());
 
     // ---------- MERKLE ROOT  ----------
-    let v_root = MerkleRootHash::new(Scalar::zero().into(), Vec::new(), Vec::new(), pattern.clone()); // Empty input
+    let v_root = MerkleRootHash::new(root2.into(), vec![be_to_scalar(&merkle_leaf).into()], pattern.clone()); // Empty input
     let _ = verifier_commit(&mut verifier, Vec::new());
-    v_root.verify(&mut verifier, &Vec::new(), &Vec::new());
+    let derived_vars: Vec<Variable> = verifier_commit(&mut verifier, derived_commitments);
+    v_root.verify(&mut verifier, &Vec::new(), &derived_vars);
 
     // ---------- VERIFY PROOF ----------
     assert!(verifier.verify(&proof, &v_pc_gens, &v_bp_gens).is_ok());

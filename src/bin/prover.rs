@@ -542,27 +542,28 @@ fn merkle_root_hash_gadget(
     coms_file: &mut File
 ) {
     let merkle_parser = gadget_grammar::MerkleRootGadgetParser::new();
-    let (root, instance_vars, witness_vars, pattern) = merkle_parser.parse(line).unwrap();
+    let (root, _, witness_vars, pattern) = merkle_parser.parse(line).unwrap();
 
     let root: LinearCombination = match root {
-        Var::Witness(_) => assignments.get_witness(root, Some(&assert_witness_32)).2[0].into(),
+        Var::Witness(_) => assignments.get_witness(root, None).2[0].into(), // Some(&assert_witness_32)
         Var::Instance(_) => be_to_scalar(&assignments.get_instance(root, Some(&assert_32))).into(),
         _ => panic!("invalid state")
     };
 
-    let instance_vars: Vec<LinearCombination> = instance_vars.into_iter()
-        .map(|var| mimc_hash(&assignments.get_instance(var.clone(), None)).into()).collect();
-
-    let mut hash_number = 0;
-    let mut witness_scalars: Vec<LinearCombination> = Vec::new();
-
+    //let mut witness_variables : Vec<Variable> = Vec::new();
+    let mut witness_scalars : Vec<Scalar> = Vec::new();
     for witness_var in witness_vars {
-        let (scalar, var) = hash_witness(prover, prover_buffer, witness_var, assignments, index, hash_number, coms_file);
-        hash_number += 1;
-        witness_scalars.push(scalar.into());
+        let var = assignments.get_witness(witness_var, None);
+        println!("witness: Var({:?}) => Scalar= {:?} ",var.2[0], var.0);
+        witness_scalars.push(var.0[0].into());
+        //witness_variables.push(var.2[0].into());
     }
+    let gadget = MerkleRootHash::new(root, Vec::new(), pattern.clone());
+    let (derived_coms, derived_wtns) = gadget.setup(prover, &witness_scalars);
 
-    let gadget = MerkleRootHash::new(root, Vec::new(), Vec::new(), pattern.clone());
+    prover_buffer.commit_drvd(&derived_wtns);
+    gadget.prove(prover_buffer, &Vec::new(), &derived_wtns);
+    assignments.cache_derived_wtns(derived_wtns);
+    assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
 
-    gadget.prove(prover_buffer, &Vec::new(), &Vec::new());
 }
