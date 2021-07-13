@@ -19,7 +19,7 @@ use bulletproofs_gadgets::equality::equality_gadget::Equality;
 use bulletproofs_gadgets::less_than::less_than_gadget::LessThan;
 use bulletproofs_gadgets::set_membership::set_membership_gadget::SetMembership;
 use bulletproofs_gadgets::inequality::inequality_gadget::Inequality;
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, scalar_to_be};
+use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, scalar_to_be, scalar_to_hex};
 use bulletproofs_gadgets::lalrpop::ast::*;
 use bulletproofs_gadgets::lalrpop::assignment_parser::*;
 use bulletproofs_gadgets::commitments::commit_single;
@@ -171,6 +171,7 @@ fn hash_witness(
     let mut hash_commitments = Vec::new();
     let (preimage_scalars, _, preimage_vars, preimage_bytes) = assignments.get_witness(var, None);
     let image: Scalar = mimc_hash(&preimage_bytes);
+    println!("image({:?}): {}", preimage_vars, scalar_to_hex(&image));
 
     let (image_scalar, image_com, image_var) = commit_single(prover, &scalar_to_be(&image));
     let image_drvd = vec![(Some(image_scalar), image_var)];
@@ -550,17 +551,13 @@ fn merkle_root_hash_gadget(
         _ => panic!("invalid state")
     };
 
-    //let mut witness_variables : Vec<Variable> = Vec::new();
-    let mut witness_scalars : Vec<Scalar> = Vec::new();
+    let mut witnesses_hash : Vec<Scalar> = Vec::new();
     for witness_var in witness_vars {
         let var = assignments.get_witness(witness_var, None);
-        println!("witness: Var({:?}) => Scalar= {:?} ",var.2[0], var.0);
-        witness_scalars.push(var.0[0].into());
-        //witness_variables.push(var.2[0].into());
+        witnesses_hash.push(mimc_hash(&var.3));
     }
     let gadget = MerkleRootHash::new(root, Vec::new(), pattern.clone());
-    let (derived_coms, derived_wtns) = gadget.setup(prover, &witness_scalars);
-
+    let (derived_coms, derived_wtns) = gadget.setup(prover, &witnesses_hash);
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &Vec::new(), &derived_wtns);
     assignments.cache_derived_wtns(derived_wtns);

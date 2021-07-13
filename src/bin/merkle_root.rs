@@ -7,8 +7,8 @@ extern crate hex;
 #[macro_use] extern crate bulletproofs_gadgets;
 use curve25519_dalek::scalar::Scalar;
 use bulletproofs_gadgets::merkle_root_hash::merkle_root::MerkleRoot;
-use bulletproofs_gadgets::mimc_hash::mimc::{mimc_hash_sponge};
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, hex_to_bytes, scalar_to_hex, scalar_to_bytes, bytes_to_hex_strs};
+use bulletproofs_gadgets::mimc_hash::mimc::{mimc_hash_sponge, mimc_hash};
+use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, hex_to_bytes, scalar_to_hex, scalar_to_bytes, bytes_to_hex_strs, str_hex_encode, num_hex_encode, scalar_to_be};
 use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::{Pattern, Pattern::*};
 
 const HEX_8:  &str = "5065676779";  // "Peggy"
@@ -99,43 +99,43 @@ fn direct_merkle_tree_pattern_hashing_calcs() {
     let hash_W1 = mimc_hash_sponge(&W1);
 
 
-    let W4_bytes_array: Vec<u8> = scalar_to_bytes(&hash_W4);
+    let W4_bytes_array: Vec<u8> = scalar_to_be(&hash_W4);
     println!("W4_bytes = {:?}", W4_bytes_array);
     println!("W4_hex = 0x{}", scalar_to_hex(&hash_W4));
     let W4_formatted_hex_array: Vec<String> = bytes_to_hex_strs(&W4_bytes_array).iter().map(|b| format!("0x{}", b)).collect();
     println!("W4 = {:?}", W4_formatted_hex_array);
 
-    let W5_bytes_array: Vec<u8> = scalar_to_bytes(&hash_W5);
+    let W5_bytes_array: Vec<u8> = scalar_to_be(&hash_W5);
     println!("W5_bytes = {:?}", W5_bytes_array);
     println!("W5_hex = 0x{}", scalar_to_hex(&hash_W5));
     let W5_formatted_hex_array: Vec<String> = bytes_to_hex_strs(&W5_bytes_array).iter().map(|b| format!("0x{}", b)).collect();
     println!("W5 = {:?}", W5_formatted_hex_array);
 
-    let W6_bytes_array: Vec<u8> = scalar_to_bytes(&hash_W6);
+    let W6_bytes_array: Vec<u8> = scalar_to_be(&hash_W6);
     println!("W6_bytes = {:?}", W6_bytes_array);
     println!("W6_hex = 0x{}", scalar_to_hex(&hash_W6));
     let W6_formatted_hex_array: Vec<String> = bytes_to_hex_strs(&W6_bytes_array).iter().map(|b| format!("0x{}", b)).collect();
     println!("W6 = {:?}", W6_formatted_hex_array);
 
-    let W7_bytes_array: Vec<u8> = scalar_to_bytes(&hash_W7);
+    let W7_bytes_array: Vec<u8> = scalar_to_be(&hash_W7);
     println!("W7_bytes = {:?}", W7_bytes_array);
     println!("W7_hex = 0x{}", scalar_to_hex(&hash_W7));
     let W7_formatted_hex_array: Vec<String> = bytes_to_hex_strs(&W7_bytes_array).iter().map(|b| format!("0x{}", b)).collect();
     println!("W7 = {:?}", W7_formatted_hex_array);
 
-    let W2_bytes_array: Vec<u8> = scalar_to_bytes(&hash_W2);
+    let W2_bytes_array: Vec<u8> = scalar_to_be(&hash_W2);
     println!("W2_bytes = {:?}", W2_bytes_array);
     println!("W2_hex = 0x{}", scalar_to_hex(&hash_W2));
     let W2_formatted_hex_array: Vec<String> = bytes_to_hex_strs(&W2_bytes_array).iter().map(|b| format!("0x{}", b)).collect();
     println!("W2 = {:?}", W2_formatted_hex_array);
 
-    let W3_bytes_array: Vec<u8> = scalar_to_bytes(&hash_W3);
+    let W3_bytes_array: Vec<u8> = scalar_to_be(&hash_W3);
     println!("W3_bytes = {:?}", W3_bytes_array);
     println!("W3_hex = 0x{}", scalar_to_hex(&hash_W3));
     let W3_formatted_hex_array: Vec<String> = bytes_to_hex_strs(&W3_bytes_array).iter().map(|b| format!("0x{}", b)).collect();
     println!("W3 = {:?}", W3_formatted_hex_array);
 
-    let W1_bytes_array: Vec<u8> = scalar_to_bytes(&hash_W1);
+    let W1_bytes_array: Vec<u8> = scalar_to_be(&hash_W1);
     println!("W1_bytes = {:?}", W1_bytes_array);
     println!("W1_hex = 0x{}", scalar_to_hex(&hash_W1));
     let W1_formatted_hex_array: Vec<String> = bytes_to_hex_strs(&W1_bytes_array).iter().map(|b| format!("0x{}", b)).collect();
@@ -163,10 +163,10 @@ fn merkle_root_calculation_for_combine_gadgets_test(){
         0x9b, 0x79, 0xa4, 0x8d, 0xaa, 0xc9, 0xa8, 0x4d
     ]; // I2
     let w_vars: Vec<Scalar> = vec![
-        mimc_hash_sponge(&vec![be_to_scalar(&image)]),
+        mimc_hash(&image),
     ];
     let i_vars: Vec<Scalar> = vec![
-        mimc_hash_sponge(&vec![be_to_scalar(&merkle_leaf)]),
+        mimc_hash(&merkle_leaf),
     ];
     println!("W2: 0x{}", bytes_to_hex_strs(&image).join(""));
     println!("I2: 0x{}", bytes_to_hex_strs(&merkle_leaf).join(""));
@@ -177,7 +177,7 @@ fn merkle_root_calculation_for_combine_gadgets_test(){
     let root2 = root_calculator.get_merkle_root_scalar();
     println!("ROOT: 0x{}", scalar_to_hex(&root));
     println!("ROOT2: 0x{}", scalar_to_hex(&root2));
-    let bytes = bytes_to_hex_strs(&scalar_to_bytes(&root2));
+    let bytes = bytes_to_hex_strs(&scalar_to_be(&root2));
     let hex_bytes: Vec<String> = bytes.iter().map(|x| format!("0x{}",x)).collect();
     println!("ROOT2 bytes: {:?}", hex_bytes);
 
@@ -203,20 +203,20 @@ fn merkle_root_calculation_passport_example() {
 
     let pattern: Pattern = hash!(hash!(hash!(W, W), hash!(W, W)), hash!(hash!(W, W), hash!(W, W)));
 
-    let w_vars: Vec<Scalar> = vec![
-        be_to_scalar(&W8),
-        be_to_scalar(&W9),
-        be_to_scalar(&W10),
-        be_to_scalar(&W11),
-        be_to_scalar(&W12),
-        be_to_scalar(&W13),
-        be_to_scalar(&W14),
-        be_to_scalar(&W15),
+    let w_hashed_vars: Vec<Scalar> = vec![
+        mimc_hash(&W8),
+        mimc_hash(&W9),
+        mimc_hash(&W10),
+        mimc_hash(&W11),
+        mimc_hash(&W12),
+        mimc_hash(&W13),
+        mimc_hash(&W14),
+        mimc_hash(&W15),
     ];
 
 
     let mut root_calculator = MerkleRoot::new();
-    root_calculator.calculate_merkle_root(&w_vars, &Vec::new(), pattern);
+    root_calculator.calculate_merkle_root(&w_hashed_vars, &Vec::new(), pattern);
     println!("Merkle Root hash: {}", root_calculator.get_merkle_root_hash());
 }
 fn main() -> std::io::Result<()> {

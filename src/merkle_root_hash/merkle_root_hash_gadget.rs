@@ -29,8 +29,9 @@ impl Gadget for MerkleRootHash {
         derived_witnesses: &Vec<(Option<Scalar>, Variable)>
     ) {
 
-        let (_, derived_witness): (Option<Scalar>, Variable) = *derived_witnesses.get(0).unwrap();
-        println!("derived_witness= {:?}", derived_witness);
+        let (derived_scalar, derived_witness): (Option<Scalar>, Variable) = *derived_witnesses.get(0).unwrap();
+        println!("derived_scalar = {:?}", derived_scalar);
+        println!("derived_witness = {:?}", derived_witness);
         let derived_witness_lc : LinearCombination = derived_witness.into();
         cs.constrain(self.root.clone() - derived_witness_lc);
     }
@@ -60,12 +61,13 @@ mod tests {
     use bulletproofs::{BulletproofGens, PedersenGens};
     use bulletproofs::r1cs::{Prover, Verifier};
     use conversions::{vars_to_lc, be_to_scalar, hex_to_bytes};
+    use mimc_hash::mimc::mimc_hash;
 
-    const W1: [u8; 32] = [  // 0x0bf34c7b2318e0f4317bc46b8aa4b84fba77c46fdb2b2c100de6c8e489c2e2bb
-        0x0b, 0xf3, 0x4c, 0x7b, 0x23, 0x18, 0xe0, 0xf4,
-        0x31, 0x7b, 0xc4, 0x6b, 0x8a, 0xa4, 0xb8, 0x4f,
-        0xba, 0x77, 0xc4, 0x6f, 0xdb, 0x2b, 0x2c, 0x10,
-        0x0d, 0xe6, 0xc8, 0xe4, 0x89, 0xc2, 0xe2, 0xbb
+    const W1: [u8; 32] = [  // 0x01ae250876c59b361be2dfe5c68e36530d1e3a7215b6c8c112014dbef90fb348
+        0x01, 0xae, 0x25, 0x08, 0x76, 0xc5, 0x9b, 0x36,
+        0x1b, 0xe2, 0xdf, 0xe5, 0xc6, 0x8e, 0x36, 0x53,
+        0x0d, 0x1e, 0x3a, 0x72, 0x15, 0xb6, 0xc8, 0xc1,
+        0x12, 0x01, 0x4d, 0xbe, 0xf9, 0x0f, 0xb3, 0x48
     ];
     /*
     const W2: [u8; 32] = [  // 0x0214b6e121107be7e63e71f134d7311a9b47d447afbc1adb1e41f0dbf309e5b4
@@ -158,8 +160,9 @@ mod tests {
         let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
 
         let (witness_scalars, witness_commitments, variables) = commit_all_single(&mut prover, &witnesses);
+        let witnesses_hashed = witnesses.iter().map(|x| mimc_hash(x)).collect();
         let gadget = MerkleRootHash::new(root.into(), Vec::new(), pattern.clone());
-        let (derived_commitments, derived_witnesses) = gadget.setup(&mut prover, &witness_scalars);
+        let (derived_commitments, derived_witnesses) = gadget.setup(&mut prover, &witnesses_hashed);
 
         gadget.prove(&mut prover, &Vec::new(), &derived_witnesses);
 

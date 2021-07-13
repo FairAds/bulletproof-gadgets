@@ -144,7 +144,7 @@ pub fn scalar_to_bytes(scalar: &Scalar) -> Vec<u8> {
 
 /// Returns the hex literal form of the Scalar.
 pub fn scalar_to_hex(scalar: &Scalar) -> String {
-    let bytes: Vec<u8> = scalar_to_bytes(scalar);
+    let bytes: Vec<u8> = scalar_to_be(scalar);
     let hex_str: String = bytes_to_hex_strs(&bytes).join("");
     hex_str
 }

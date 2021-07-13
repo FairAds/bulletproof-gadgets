@@ -1,7 +1,7 @@
 use mimc_hash::mimc::mimc_hash_sponge;
 use curve25519_dalek::scalar::Scalar;
 use merkle_tree::merkle_tree_gadget::{Pattern};
-use conversions::{scalar_to_hex, scalar_to_bytes, str_hex_decode, num_hex_decode};
+use conversions::{scalar_to_hex};
 
 pub struct MerkleRoot {
     root: Scalar
@@ -20,12 +20,15 @@ impl MerkleRoot {
         w_vars: &mut Vec<Scalar>,
         i_vars: &mut Vec<Scalar>,
         pattern: Pattern,
-        index: &mut u8,
+        index: &mut usize,
     ) -> Scalar {
-        println!("---------------");
+        let tab = ".    ".repeat(*index);
+        println!("{}Parse call index = {}", tab, &index);
+        *index = *index +1;
+        println!("{}---------------", tab);
         let preimage: Vec<Scalar>;
         let patt = pattern.clone();
-        println!("MerkleTreePattern = {}", patt);
+        println!("{}MerkleTreePattern = {}",tab, patt);
         match pattern {
             Pattern::Hash(left @ box Pattern::Hash(_,_), box Pattern::W) =>
                 preimage = vec![self.parse_merkle_tree( w_vars, i_vars, *left, index), self.next_val(w_vars)],
@@ -48,23 +51,14 @@ impl MerkleRoot {
             Pattern::W => preimage = vec![self.next_val(w_vars)],
             Pattern::I => preimage = vec![self.next_val(i_vars)]
         }
-        println!("Parse call index = {}", &index);
-        *index = *index +1;
-        println!("Preimage(decoded): [");
+
+        println!("{}Preimage({}): [", tab, index);
         for p in preimage.iter(){
-            let bytes_array = scalar_to_bytes(&p);
-            let decoded_str = str_hex_decode(&bytes_array);
-            if decoded_str.eq("") && bytes_array.len() <= 8 {
-                let decoded_int = num_hex_decode(&bytes_array);
-                println!("      {},", decoded_int);
-            }
-            else{
-                println!("      {},", decoded_str);
-            }
+            println!("{}      0x{},",tab, scalar_to_hex(p));
         }
-        println!("]");
+        println!("{}]",tab);
         let hash = mimc_hash_sponge(&preimage);
-        //println!("Recursive hash node ?? = 0x{}", scalar_to_hex(&hash));
+        println!("{}Image({}): 0x{}", tab, index, scalar_to_hex(&hash));
         hash
     }
     fn next_val(&self, values: &mut Vec<Scalar>) -> Scalar {
@@ -81,7 +75,7 @@ impl MerkleRoot {
     ){
         let mut w_values: Vec<Scalar> = w_vars.clone();
         let mut i_values: Vec<Scalar> = i_vars.clone();
-        let mut index: u8 = 0;
+        let mut index: usize = 0;
         self.root = self.parse_merkle_tree(&mut w_values, &mut i_values, pattern, &mut index);
     }
 
