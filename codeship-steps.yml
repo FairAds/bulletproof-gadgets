@@ -1,0 +1,10 @@
+- type: serial
+  name: "Tests"
+  steps:
+    - name: "Build"
+      service: bulletproof-gadgets
+      command: cargo build --verbose
+
+    - name: "Test"
+      service: bulletproof-gadgets
+      command: cargo test --
