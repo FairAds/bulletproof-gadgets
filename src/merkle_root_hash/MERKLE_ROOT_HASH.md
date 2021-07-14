@@ -63,10 +63,30 @@ cargo run --bin prover custom_examples/test_hash
 cargo run --bin verifier custom_examples/test_hash
 ```
 
-### (WIP) Merkle Root Hash calculations for passport example:
-A script `merkle_root` using the "Non-bulletproof" MiMC Hash Merkle Root implementation for the 
-passport example values can be run with the following command:
+### (WIP) Merkle Root Hash calculations:
+
+A script `merkle_root` using the "Non-bulletproof" MiMC Hash Merkle Root implementation can be run over a given
+`.json` file with the following command:
 
 ```
-cargo run --bin merkle_root
+cargo run --bin merkle_root <filename>
+```
+
+Where `<filename>` must be replaced with the filepath of the `.json` file, without its extension. For example,
+
+*NOTE: The json file can handle up to 8 values so far.*
+
+```
+cargo run --bin merkle_root custom_examples/test_root.json
+```
+
+The current issue of having different Merkle Root hash values verified by the previous MerkleTreeGadget can be explored in the
+`user_story_s1` example, where the Merkle Root Hash of the `user_story_s1.json` witness data is different from the hash
+defined in the `user_story_s1.inst`, which contains the original Merkle Root that can be validated using the `MERKLE` gadget.
+
+However, the new MerkleRootHash Gadget can accept this Merkle Root computed from the `.json` file and verify it correctly. 
+To try it, you have to replace the gadget `MERKLE` for `ROOT` in the `user_story_s1.gadgets` and then,
+replace the `I0` value in `user_story_s1.inst` with the output Merkle Root hash given by running:
+```
+cargo run --bin merkle_root custom_examples/user_story_s1.json
 ```

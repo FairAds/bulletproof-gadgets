@@ -8,8 +8,12 @@ extern crate hex;
 use curve25519_dalek::scalar::Scalar;
 use bulletproofs_gadgets::merkle_root_hash::merkle_root::MerkleRoot;
 use bulletproofs_gadgets::mimc_hash::mimc::{mimc_hash_sponge, mimc_hash};
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, hex_to_bytes, scalar_to_hex, scalar_to_bytes, bytes_to_hex_strs, str_hex_encode, num_hex_encode, scalar_to_be};
+use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, hex_to_bytes, scalar_to_hex, scalar_to_bytes, bytes_to_hex_strs, str_hex_encode, num_hex_encode, scalar_to_be, str_hex_decode};
 use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::{Pattern, Pattern::*};
+use std::fs::File;
+use std::env;
+
+const PROFILE_EXT: &str = ".json";
 
 const HEX_8:  &str = "5065676779";  // "Peggy"
 const HEX_9:  &str = "50726f766572736f6e";  // "Proverson"
@@ -219,10 +223,144 @@ fn merkle_root_calculation_passport_example() {
     root_calculator.calculate_merkle_root(&w_hashed_vars, &Vec::new(), pattern);
     println!("Merkle Root hash: {}", root_calculator.get_merkle_root_hash());
 }
+
+fn calc_merkle_root(witness_vars: Vec<String>, pattern: Pattern) {
+    let w_bytes: Vec<Vec<u8>> = witness_vars.iter().map(|x| hex_to_bytes(x.clone()).unwrap()).collect();
+    println!("Witnesses as byte vectors:");
+    for x in w_bytes.iter() {
+        println!("    {:?}", x);
+    }
+    let w_hashed: Vec<Scalar> = w_bytes.iter().map(|x| mimc_hash(x)).collect();
+    println!("Hashed witnesses:");
+    for x in w_hashed.iter() {
+        println!("    0x{}", scalar_to_hex(x));
+        println!("        as scalar: {:?}", x);
+    }
+    let mut root_calculator = MerkleRoot::new();
+    root_calculator.calculate_merkle_root(&w_hashed, &Vec::new(), pattern);
+    println!("Merkle Root hash: {}", root_calculator.get_merkle_root_hash());
+}
+
+
+fn parse_witness_values(json: &serde_json::Value, witnesses_values: &mut Vec<serde_json::Value>) {
+    for (key, value) in json.as_object().unwrap() {
+        println!("{:?} ===> {:?}", key, value);
+        if !value.is_object() {
+            witnesses_values.push(value.clone());
+        }
+        else{
+            parse_witness_values(value, witnesses_values);
+        }
+    }
+}
+fn get_merkle_tree_pattern(n_vars: u64) -> Pattern{
+    let mut pattern: Pattern = Pattern::W;
+    match n_vars {
+        1 => pattern = Pattern::W,
+        2 => pattern = hash!(W,W),
+        3 => pattern = hash!(
+            hash!(W,W),
+            W
+        ),
+        4 => pattern = hash!(
+            hash!(W,W),
+            hash!(W,W)
+        ),
+        5 => pattern = hash!(
+            hash!(
+                hash!(W,W),
+                hash!(W,W)
+            ),
+            W
+        ),
+        6 => pattern = hash!(
+            hash!(
+                hash!(W,W),
+                hash!(W,W)
+            ),
+            hash!(W,W)
+        ),
+        7 => pattern = hash!(
+            hash!(
+                hash!(
+                    hash!(W,W),
+                    hash!(W,W)
+                ),
+                hash!(W,W)
+            ),
+            W
+        ),
+        8 => pattern = hash!(
+            hash!(
+                hash!(W,W),
+                hash!(W,W)
+            ),
+            hash!(
+                hash!(W,W),
+                hash!(W,W)
+            )
+        ),
+        _ => panic!("Invalid witness variables length (>8)")
+    }
+    pattern
+}
+
+
+
+fn parse_json(filename: &str) -> std::io::Result<(Vec<String>)> {
+    let file = File::open(format!("{}{}", filename, PROFILE_EXT))?;
+    let json: serde_json::Value = serde_json::from_reader(file)?;
+    let mut witnesses_values: Vec<serde_json::Value> = Vec::new();
+    parse_witness_values(&json, &mut witnesses_values);
+    Ok(get_witness_hex_literals(&witnesses_values))
+}
+
+fn get_witness_hex_literals(witnesses_data: &Vec<serde_json::Value>) -> Vec<String> {
+    let mut witnesses_hex_literals: Vec<String> = Vec::new();
+    for value in witnesses_data.iter(){
+        if value.is_string(){
+            witnesses_hex_literals.push(str_hex_encode(value.as_str().unwrap().into()));
+        }
+        if value.is_number(){
+            witnesses_hex_literals.push(num_hex_encode(value.as_u64().unwrap().into()));
+        }
+    }
+    witnesses_hex_literals
+}
+fn merkle_root_calculation_user_story_3(){
+    let HEX_0 = "31314d45484c44523256";
+    let HEX_1 = "4c4e58562d4930544344532d3958";
+
+    let bytes_0 = hex_to_bytes(HEX_0.into()).unwrap();
+    let bytes_1 = hex_to_bytes(HEX_1.into()).unwrap();
+
+    let value_0 = str_hex_decode(&bytes_0);
+    let value_1 = str_hex_decode(&bytes_1);
+
+    println!("VALUE 0: {}", value_0);
+    println!("VALUE 1: {}", value_1);
+
+    let w_hashed_vars: Vec<Scalar> = vec![
+        mimc_hash(&bytes_0),
+        mimc_hash(&bytes_1),
+    ];
+    let hash = mimc_hash_sponge(&w_hashed_vars);
+
+    println!("Merkle Root hash: 0x{}", scalar_to_hex(&hash));
+}
 fn main() -> std::io::Result<()> {
+    let filename = Box::leak(env::args().nth(1).expect("missing argument").into_boxed_str());
+    let witness_vars = parse_json(filename).expect("unable to read .json file");
+    let pattern: Pattern = get_merkle_tree_pattern(witness_vars.len() as u64);
+    calc_merkle_root(witness_vars, pattern);
+
+    //merkle_root_calculation_user_story_3();
+
+
     //direct_merkle_tree_pattern_hashing_calcs();
     //merkle_root_calculation_for_combine_gadgets_test();
-    merkle_root_calculation_passport_example();
+    //println!("\n\n\n\n Passport Example:\n\n");
+    //merkle_root_calculation_passport_example();
     Ok(())
 }
 
