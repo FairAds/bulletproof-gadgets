@@ -9,7 +9,7 @@ WORKDIR /bulletproof-gadgets
 
 COPY build.rs ./build.rs
 COPY Cargo.toml ./Cargo.toml
-COPY Cargo.lock ./Cargo.lock
+
 COPY src ./src
 COPY tests ./tests
 
