@@ -1,0 +1,20 @@
+{
+  "profile": {
+    "firstName": "John",
+    "lastName": "Doe",
+    "dateOfBirth": {
+      "day": 9,
+      "month": 6,
+      "year": 1956
+    },
+    "placeOfBirth": "Santiago"
+  },
+  "finance": {
+    "btcBalance": 10,
+    "bankBalance": 4444
+  },
+  "personal": {
+    "likesPizza": 1,
+    "hasChildren": 1
+  }
+}

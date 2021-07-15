@@ -1,5 +1,5 @@
 # New MerkleRootHash Bulletproof Gadget:
-Syntax is the same used for the MerkleTree256 gadget (`MERKLE I0 (W0 W1)`), but the gadget token is renamed as ROOT.
+Syntax is the same used for the MerkleTree256 gadget (`MERKLE I0 (W0 W1)`), but the gadget token is renamed as `ROOT`.
 Then, a valid `.gadgets` file instruction for this new gadget should have lines in the form:
 ```
 ROOT I0 (W0 W1)
@@ -19,6 +19,10 @@ cargo run --bin prover custom_examples/test_root
 ```
 cargo run --bin verifier custom_examples/test_root
 ```
+
+**NOTE (2021-07-15):** The "Non-bulletproof" MiMC Hash Merkle Root implementation is now compatible with 
+the previous MerkleTree Gadget. Thus, the new Merkle Root Hash gadget will not be used. 
+
 
 # "Non-bulletproof" MiMC Hash Merkle Root implementation:
 
@@ -63,30 +67,32 @@ cargo run --bin prover custom_examples/test_hash
 cargo run --bin verifier custom_examples/test_hash
 ```
 
-### (WIP) Merkle Root Hash calculations:
+### Merkle Root Hash calculations:
 
-A script `merkle_root` using the "Non-bulletproof" MiMC Hash Merkle Root implementation can be run over a given
-`.json` file with the following command:
-
-```
-cargo run --bin merkle_root <filename>
-```
-
-Where `<filename>` must be replaced with the filepath of the `.json` file, without its extension. For example,
-
-*NOTE: The json file can handle up to 8 values so far.*
+A script `merkle_root` calculating the MiMC Hash Merkle Root can be run over a given
+`.json` and `.schema.json` files (schema must be formatted as used in `zkStrata`) with the following command:
 
 ```
-cargo run --bin merkle_root custom_examples/test_root.json
+cargo run --bin merkle_root <name>
 ```
 
-The current issue of having different Merkle Root hash values verified by the previous MerkleTreeGadget can be explored in the
-`user_story_s1` example, where the Merkle Root Hash of the `user_story_s1.json` witness data is different from the hash
-defined in the `user_story_s1.inst`, which contains the original Merkle Root that can be validated using the `MERKLE` gadget.
+Where `<name>` must be replaced with the name of the document that has both a `<name>.json` file and a `<name>.schema.json` file.
 
-However, the new MerkleRootHash Gadget can accept this Merkle Root computed from the `.json` file and verify it correctly. 
-To try it, you have to replace the gadget `MERKLE` for `ROOT` in the `user_story_s1.gadgets` and then,
-replace the `I0` value in `user_story_s1.inst` with the output Merkle Root hash given by running:
+For example,
+
 ```
-cargo run --bin merkle_root custom_examples/user_story_s1.json
+cargo run --release --bin merkle_root custom_examples/passport-example
 ```
+
+The default console log level is set to `INFO`, however, for debugging purposes you can set the `RUST_LOG` environment variable
+to `DEBUG`, which will print the variables conversions and the multiple Merkle Tree hashing steps.
+```
+RUST_LOG=DEBUG cargo run --release --bin merkle_root custom_examples/passport-example
+```
+
+**IMPORTANT:** The `.json` and `.schema.json` files that can successfully run this script
+must adhere to the following restrictions:
+1. The MerkleRoot statement IS defined at the `validationRule` in the `.schema.json` file.
+2. The `validationRule` field does not have any statement after the `IS MERKLE ROOT OF` premise.
+3. Only `private` fields are used in the MerkleTree pattern definition.
+4. The number and order of fields in the `.json` file is the same as the ones used in the `validationRule`.

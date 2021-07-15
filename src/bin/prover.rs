@@ -19,7 +19,7 @@ use bulletproofs_gadgets::equality::equality_gadget::Equality;
 use bulletproofs_gadgets::less_than::less_than_gadget::LessThan;
 use bulletproofs_gadgets::set_membership::set_membership_gadget::SetMembership;
 use bulletproofs_gadgets::inequality::inequality_gadget::Inequality;
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, scalar_to_be, scalar_to_hex};
+use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, scalar_to_be};
 use bulletproofs_gadgets::lalrpop::ast::*;
 use bulletproofs_gadgets::lalrpop::assignment_parser::*;
 use bulletproofs_gadgets::commitments::commit_single;
@@ -171,7 +171,6 @@ fn hash_witness(
     let mut hash_commitments = Vec::new();
     let (preimage_scalars, _, preimage_vars, preimage_bytes) = assignments.get_witness(var, None);
     let image: Scalar = mimc_hash(&preimage_bytes);
-    println!("image({:?}): {}", preimage_vars, scalar_to_hex(&image));
 
     let (image_scalar, image_com, image_var) = commit_single(prover, &scalar_to_be(&image));
     let image_drvd = vec![(Some(image_scalar), image_var)];

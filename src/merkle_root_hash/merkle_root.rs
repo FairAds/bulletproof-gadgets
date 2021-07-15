@@ -23,12 +23,12 @@ impl MerkleRoot {
         index: &mut usize,
     ) -> Scalar {
         let tab = ".    ".repeat(*index);
-        println!("{}Parse call index = {}", tab, &index);
+        log::debug!("{}Parse call index = {}", tab, &index);
         *index = *index +1;
-        println!("{}---------------", tab);
+        log::debug!("{}---------------", tab);
         let preimage: Vec<Scalar>;
         let patt = pattern.clone();
-        println!("{}MerkleTreePattern = {}",tab, patt);
+        log::debug!("{}MerkleTreePattern = {}",tab, patt);
         match pattern {
             Pattern::Hash(left @ box Pattern::Hash(_,_), box Pattern::W) =>
                 preimage = vec![self.parse_merkle_tree( w_vars, i_vars, *left, index), self.next_val(w_vars)],
@@ -52,13 +52,13 @@ impl MerkleRoot {
             Pattern::I => preimage = vec![self.next_val(i_vars)]
         }
 
-        println!("{}Preimage({}): [", tab, index);
+        log::debug!("{}Preimage({}): [", tab, index);
         for p in preimage.iter(){
-            println!("{}      0x{},",tab, scalar_to_hex(p));
+            log::debug!("{}      0x{},",tab, scalar_to_hex(p));
         }
-        println!("{}]",tab);
+        log::debug!("{}]",tab);
         let hash = mimc_hash_sponge(&preimage);
-        println!("{}Image({}): 0x{}", tab, index, scalar_to_hex(&hash));
+        log::debug!("{}Image({}): 0x{}", tab, index, scalar_to_hex(&hash));
         hash
     }
     fn next_val(&self, values: &mut Vec<Scalar>) -> Scalar {
@@ -148,7 +148,7 @@ mod tests {
         let mut root_calculator = MerkleRoot::new();
         root_calculator.calculate_merkle_root(&w_hashed_vars, &Vec::new(), pattern);
         let rootHash_hex: String = root_calculator.get_merkle_root_hash();
-        println!("Merkle Root hash: {}", rootHash_hex);
+        log::debug!("Merkle Root hash: {}", rootHash_hex);
         assert_eq!(MERKLE_ROOT_HASH_HEX, rootHash_hex);
     }
 }
