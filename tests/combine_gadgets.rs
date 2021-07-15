@@ -19,7 +19,6 @@ use bulletproofs_gadgets::bounds_check::bounds_check_gadget::BoundsCheck;
 use bulletproofs_gadgets::mimc_hash::mimc_hash_gadget::MimcHash256;
 use bulletproofs_gadgets::merkle_root_hash::merkle_root_hash_gadget::MerkleRootHash;
 use bulletproofs_gadgets::conversions::be_to_scalar;
-use bulletproofs_gadgets::mimc_hash::mimc::mimc_hash;
 
 #[test]
 fn test_combine_gadgets() {
@@ -80,14 +79,8 @@ fn test_combine_gadgets() {
     p_merkle.prove(&mut prover, &Vec::new(), &Vec::new());
 
     // ---------- MERKLE ROOT  ----------
-    let root2: Scalar = be_to_scalar(&vec![
-        0x09, 0xff, 0x3e, 0xea, 0x50, 0x08, 0xd0, 0xda,
-        0x90, 0x7e, 0x02, 0x40, 0x93, 0x86, 0x4a, 0xec,
-        0x2f, 0x0a, 0xd2, 0x99, 0x30, 0x6d, 0x9c, 0x70,
-        0x0a, 0xc8, 0x6f, 0xc2, 0x90, 0x56, 0xc8, 0xb4
-    ]);
-    let p_root = MerkleRootHash::new(root2.into(),vec![mimc_hash(&merkle_leaf)],  pattern.clone());
-    let (derived_commitments, derived_witnesses) = p_root.setup(&mut prover, &vec![mimc_hash(&image)]);
+    let p_root = MerkleRootHash::new(root.into(),vec![be_to_scalar(&merkle_leaf).into()],  pattern.clone());
+    let (derived_commitments, derived_witnesses) = p_root.setup(&mut prover, &vec![w2_scalar.into()]);
 
     p_root.prove(&mut prover, &Vec::new(), &derived_witnesses);
 
@@ -117,7 +110,7 @@ fn test_combine_gadgets() {
     v_merkle.verify(&mut verifier, &Vec::new(), &Vec::new());
 
     // ---------- MERKLE ROOT  ----------
-    let v_root = MerkleRootHash::new(root2.into(), vec![be_to_scalar(&merkle_leaf).into()], pattern.clone()); // Empty input
+    let v_root = MerkleRootHash::new(root.into(), vec![be_to_scalar(&merkle_leaf).into()], pattern.clone()); // Empty input
     let _ = verifier_commit(&mut verifier, Vec::new());
     let derived_vars: Vec<Variable> = verifier_commit(&mut verifier, derived_commitments);
     v_root.verify(&mut verifier, &Vec::new(), &derived_vars);

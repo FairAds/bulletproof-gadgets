@@ -1,10 +1,38 @@
 - type: serial
   name: "Tests"
+  service: bulletproof-gadgets
   steps:
-    - name: "Build"
-      service: bulletproof-gadgets
-      command: cargo build --verbose
+    - name: "Build Release"
+      command: cargo build --release
 
     - name: "Test"
-      service: bulletproof-gadgets
       command: cargo test --
+
+- type: parallel
+  name: "Integration tests"
+  service: bulletproof-gadgets
+  steps:
+    - name: "Test bounds_check"
+      command: ./tests/scripts/test_prover_verifier.sh bounds_check
+    - name: "Test equality"
+      command: ./tests/scripts/test_prover_verifier.sh equality
+    - name: "Test inequality"
+      command: ./tests/scripts/test_prover_verifier.sh inequality
+    - name: "Test less_than"
+      command: ./tests/scripts/test_prover_verifier.sh less_than
+    - name: "Test merkle_tree"
+      command: ./tests/scripts/test_prover_verifier.sh merkle_tree
+    - name: "Test mimc_hash"
+      command: ./tests/scripts/test_prover_verifier.sh mimc_hash
+    - name: "Test set_membership"
+      command: ./tests/scripts/test_prover_verifier.sh set_membership
+    - name: "Test or_conjunction"
+      command: ./tests/scripts/test_prover_verifier.sh or
+    - name: "Test or_conjunction 2"
+      command: ./tests/scripts/test_prover_verifier.sh or2
+    - name: "Test or_conjunction 3"
+      command: ./tests/scripts/test_prover_verifier.sh or3
+    - name: "Test or_conjunction 4"
+      command: ./tests/scripts/test_prover_verifier.sh or4
+    - name: "Test or_conjunction 5"
+      command: ./tests/scripts/test_prover_verifier.sh or5

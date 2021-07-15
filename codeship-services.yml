@@ -2,4 +2,6 @@ bulletproof-gadgets:
   build:
     image: rust:1.53.0
     dockerfile_path: Dockerfile
+    volumes:
+      - ./tests/resources:/tests/resources
   cached: true

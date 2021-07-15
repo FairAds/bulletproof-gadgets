@@ -90,3 +90,65 @@ impl MerkleRoot {
     }
 
 }
+
+
+#[cfg(test)]
+mod tests {
+    #![allow(warnings)]
+    use super::*;
+    use merkle_tree::merkle_tree_gadget::Pattern::*;
+    use conversions::hex_to_bytes;
+    use mimc_hash::mimc::{mimc_hash_sponge, mimc_hash};
+
+    const HEX_8:  &str = "5065676779";  // "Peggy"
+    const HEX_9:  &str = "50726f766572736f6e";  // "Proverson"
+    const HEX_10: &str = "012fcfd4";    // 019910612
+    const HEX_11: &str = "54696d62756b7475";    // "Timbuktu"
+    const HEX_12: &str = "01337894";    // 020150420
+    const HEX_13: &str = "0134ff33";    // 020250419
+    const HEX_14: &str = "50617373706f7274204f6666696365205a7572696368"; // "Passport Office Zurich"
+    const HEX_15: &str = "82440e";  // 8537102
+
+    // The "original" merkle root hash of the Passport Example
+    const MERKLE_ROOT_HASH_HEX: &str = "0x06b131554e4e50b52e096971533411c7623504f6a56edf1bccdc810672efdd22";
+
+    #[test]
+    fn merkle_root_passport_example_test() {
+
+        //                   1
+        //                  / \
+        //         2                  3
+        //        / \                / \
+        //     4        5        6        7
+        //    / \      / \      / \      / \
+        //   8   9   10   11  12   13  14   15
+
+        let W8: Vec<u8> = hex_to_bytes(String::from(HEX_8)).unwrap();
+        let W9: Vec<u8> = hex_to_bytes(String::from(HEX_9)).unwrap();
+        let W10: Vec<u8> = hex_to_bytes(String::from(HEX_10)).unwrap();
+        let W11: Vec<u8> = hex_to_bytes(String::from(HEX_11)).unwrap();
+        let W12: Vec<u8> = hex_to_bytes(String::from(HEX_12)).unwrap();
+        let W13: Vec<u8> = hex_to_bytes(String::from(HEX_13)).unwrap();
+        let W14: Vec<u8> = hex_to_bytes(String::from(HEX_14)).unwrap();
+        let W15: Vec<u8> = hex_to_bytes(String::from(HEX_15)).unwrap();
+
+        let pattern: Pattern = hash!(hash!(hash!(W, W), hash!(W, W)), hash!(hash!(W, W), hash!(W, W)));
+
+        let w_hashed_vars: Vec<Scalar> = vec![
+            mimc_hash(&W8),
+            mimc_hash(&W9),
+            mimc_hash(&W10),
+            mimc_hash(&W11),
+            mimc_hash(&W12),
+            mimc_hash(&W13),
+            mimc_hash(&W14),
+            mimc_hash(&W15),
+        ];
+
+        let mut root_calculator = MerkleRoot::new();
+        root_calculator.calculate_merkle_root(&w_hashed_vars, &Vec::new(), pattern);
+        let rootHash_hex: String = root_calculator.get_merkle_root_hash();
+        println!("Merkle Root hash: {}", rootHash_hex);
+        assert_eq!(MERKLE_ROOT_HASH_HEX, rootHash_hex);
+    }
+}
