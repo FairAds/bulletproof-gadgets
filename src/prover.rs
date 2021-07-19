@@ -56,10 +56,10 @@ fn main() -> std::io::Result<()> {
     let mut assignments = Assignments::new();
 
     let mut coms_file = File::create(format!("{}{}", filename, COMMITMENTS_EXT))?;
-    
+
     // ---------- PARSE .inst FILE ----------
     assignments.parse_inst(filename.to_string()).expect("unable not read .inst file");
-    
+
     // ---------- PARSE .wtns FILE, WRITE .coms FILE ----------
     assignments.parse_wtns(filename.to_string(), &mut prover, &mut coms_file).expect("could not read .wtns file");
 
@@ -77,14 +77,14 @@ fn main() -> std::io::Result<()> {
     while iter.peek().is_some() {
         let (index, line) = iter.next().unwrap();
         let line = line.unwrap();
-    
+
         let local_initialization = vec![prover_buffer.buffer().into_iter().map(|op| op.clone()).collect()];
         parse_conjunction(&mut iter, &line, &mut assignments, &mut prover, &mut prover_buffer, &mut coms_file, local_initialization);
         parse_gadget(&line, &mut assignments, &mut prover, &mut prover_buffer, index, &mut coms_file);
     }
 
     assign_buffer(&mut prover, &prover_buffer);
-    
+
     // output number of constraints
     println!("{}", prover.num_constraints());
 
@@ -105,7 +105,7 @@ fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &ProverBuffer) {
             Operation::Multiply((left, right)) => {
                 main.multiply(left.clone(), right.clone());
             },
-            Operation::AllocateMultiplier(assignment) => { 
+            Operation::AllocateMultiplier(assignment) => {
                 assert!(main.allocate_multiplier(assignment.clone()).is_ok());
             },
             Operation::Constrain(lc) => {
@@ -185,7 +185,7 @@ fn hash_witness(
 
     assignments.cache_derived_wtns(derived_wtns);
     assignments.parse_derived_wtns(hash_commitments.clone(), index, subroutine, coms_file).expect("unable to write .coms file");
-    
+
     (image_scalar, image_var)
 }
 
@@ -214,7 +214,7 @@ fn or_conjunction(
     assignments.buffer_commit_wtns(&mut prover_buffer);
     assignments.buffer_commit_drvd(&mut prover_buffer);
     prover_buffer.initialize_from(initialization.clone());
-    
+
     if iter.peek().is_none() {
         panic!("unexpected end of input");
     }
@@ -260,11 +260,11 @@ fn bounds_check_gadget(
 ) {
     let bound_parser = gadget_grammar::BoundGadgetParser::new();
     let (var, min, max) = bound_parser.parse(line).unwrap();
-    
+
     let var = assignments.get_witness(var, Some(&assert_witness_32));
     let min: Vec<u8> = assignments.get_instance(min, Some(&assert_32));
     let max: Vec<u8> = assignments.get_instance(max, Some(&assert_32));
-    
+
     let gadget = BoundsCheck::new(&min, &max);
 
     let (derived_coms, derived_wtns) = gadget.setup(prover, &var.0);
@@ -296,7 +296,7 @@ fn mimc_hash_gadget(
 
     let gadget = MimcHash256::new(image);
     let (derived_coms, derived_wtns) = gadget.setup(prover, &preimage.0);
-    
+
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &preimage.2, &derived_wtns);
 
@@ -334,7 +334,7 @@ fn merkle_tree_gadget(
     }
 
     let gadget = MerkleTree256::new(root, instance_vars, witness_lcs, pattern.clone());
-        
+
     gadget.prove(prover_buffer, &Vec::new(), &Vec::new());
 }
 
@@ -353,9 +353,9 @@ fn equality_gadget(
         Var::Instance(_) => be_to_scalars(&assignments.get_instance(right, None)).into_iter().map(|scalar| scalar.into()).collect(),
         _ => panic!("invalid state")
     };
-    
+
     let gadget = Equality::new(right);
-    
+
     gadget.prove(prover_buffer, &left_vars, &Vec::new());
 }
 
@@ -375,10 +375,10 @@ fn less_than_gadget(
 
     let gadget = LessThan::new(left_vars[0].into(), Some(left_scalars[0]), right_vars[0].into(), Some(right_scalars[0]));
     let (derived_coms, derived_wtns) = gadget.setup(prover, &Vec::new());
-    
+
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &Vec::new(), &derived_wtns);
-        
+
     assignments.cache_derived_wtns(derived_wtns);
     assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
 }
@@ -409,13 +409,13 @@ fn inequality_gadget(
         },
         _ => panic!("invalid state")
     };
-    
+
     let gadget = Inequality::new(right_lc, Some(right_scalars));
     let (derived_coms, derived_wtns) = gadget.setup(prover, &left.0);
-    
+
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &left.2, &derived_wtns);
-        
+
     assignments.cache_derived_wtns(derived_wtns);
     assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
 }
@@ -459,7 +459,7 @@ fn set_membership_gadget(
     if !apply_hashing {
         for element in set.clone() {
             match element {
-                Var::Witness(_) => { 
+                Var::Witness(_) => {
                     let (witness_scalar, _, witness_var, _) = assignments.get_witness(element, None);
                     if witness_var.len() == 1 {
                         witness_set_scalars.push(witness_scalar[0]);
@@ -487,7 +487,7 @@ fn set_membership_gadget(
         let mut hash_number = 1;
         let (scalar, lc) = match member {
             Var::Witness(_) => {
-                let (scalar, var) = hash_witness(prover, prover_buffer, member, assignments, index, hash_number, coms_file);    
+                let (scalar, var) = hash_witness(prover, prover_buffer, member, assignments, index, hash_number, coms_file);
                 hash_number += 1;
                 (scalar, var.into())
             },
@@ -523,10 +523,10 @@ fn set_membership_gadget(
 
     let gadget = SetMembership::new(member_lc, Some(member_scalar), instance_set_lcs.clone(), Some(instance_set_scalars));
     let (derived_coms, derived_wtns) = gadget.setup(prover, &witness_set_scalars);
-    
+
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &witness_set_vars, &derived_wtns);
-        
+
     assignments.cache_derived_wtns(derived_wtns);
     assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
 }

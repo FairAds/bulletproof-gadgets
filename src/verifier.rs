@@ -51,7 +51,7 @@ fn main() -> std::io::Result<()> {
     let mut verifier_transcript = Transcript::new(filename.as_bytes());
     let pc_gens = PedersenGens::default();
     let mut verifier = Verifier::new(&mut verifier_transcript);
-    
+
     // ---------- CREATE BUFFER ----------
     let mut buffer_transcript = Transcript::new(b"BufferTranscript");
     let buffer_verifier = Verifier::new(&mut buffer_transcript);
@@ -106,7 +106,7 @@ fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &VerifierBuffer) {
             Operation::Multiply((left, right)) => {
                 main.multiply(left.clone(), right.clone());
             },
-            Operation::AllocateMultiplier(assignment) => { 
+            Operation::AllocateMultiplier(assignment) => {
                 assert!(main.allocate_multiplier(assignment.clone()).is_ok());
             },
             Operation::Constrain(lc) => {
@@ -194,7 +194,7 @@ fn bounds_check_gadget(
 ) {
     let bound_parser = gadget_grammar::BoundGadgetParser::new();
     let (var, min, max) = bound_parser.parse(&line).unwrap();
-    
+
     let var = assignments.get_commitment(var, 0);
     let min: Vec<u8> = assignments.get_instance(min, Some(&assert_32));
     let max: Vec<u8> = assignments.get_instance(max, Some(&assert_32));
@@ -248,7 +248,7 @@ fn merkle_tree_gadget(
 
     let instance_vars: Vec<LinearCombination> = instance_vars.into_iter()
         .map(|var| hash_instance(var, &assignments)).collect();
-    
+
     let mut hash_number = 0;
     let witness_vars: Vec<LinearCombination> = witness_vars.into_iter()
         .map(|var| {
@@ -256,7 +256,7 @@ fn merkle_tree_gadget(
             hash_number += 1;
             image_var.into()
         }).collect();
-    
+
     let gadget = MerkleTree256::new(root.into(), instance_vars, witness_vars, pattern.clone());
     gadget.verify(verifier, &Vec::new(), &Vec::new());
 }
@@ -268,15 +268,15 @@ fn equality_gadget(
 ) {
     let equality_parser = gadget_grammar::EqualityGadgetParser::new();
     let (left, right) = equality_parser.parse(&line).unwrap();
-    
+
     let left = assignments.get_all_commitments(left);
-    
+
     let right: Vec<LinearCombination> = match right {
         Var::Witness(_) => assignments.get_all_commitments(right).into_iter().map(|var| var.into()).collect(),
         Var::Instance(_) => be_to_scalars(&assignments.get_instance(right, None)).into_iter().map(|scalar| scalar.into()).collect(),
         _ => panic!("invalid state")
     };
-    
+
     let gadget = Equality::new(right);
     gadget.verify(verifier, &left, &Vec::new());
 }
@@ -289,13 +289,13 @@ fn less_than_gadget(
 ) {
     let less_than_parser = gadget_grammar::LessThanGadgetParser::new();
     let (left, right) = less_than_parser.parse(&line).unwrap();
-    
+
     let left = assignments.get_commitment(left, 0);
     let right = assignments.get_commitment(right, 0);
-    
+
     let delta = assignments.get_derived(index, 0, 0);
     let delta_inv = assignments.get_derived(index, 1, 0);
-    
+
     let gadget = LessThan::new(left.into(), None, right.into(), None);
     gadget.verify(verifier, &Vec::new(), &vec![delta, delta_inv]);
 }
@@ -308,25 +308,25 @@ fn inequality_gadget(
 ) {
     let inequality_parser = gadget_grammar::InequalityGadgetParser::new();
     let (left, right) = inequality_parser.parse(&line).unwrap();
-    
+
     let left: Vec<Variable> = assignments.get_all_commitments(left);
-    
+
     let right_lc: Vec<LinearCombination> = match right {
         Var::Witness(_) => assignments.get_all_commitments(right).into_iter().map(|var| var.into()).collect(),
         Var::Instance(_) => be_to_scalars(&assignments.get_instance(right, None)).into_iter().map(|scalar| scalar.into()).collect(),
         _ => panic!("invalid state")
     };
-    
+
     let mut derived_witnesses: Vec<Variable> = Vec::new();
-    
+
     // get delta and delta_inv values
     for i in 0..(left.len() * 2) {
         derived_witnesses.push(assignments.get_derived(index, i, 0));
     }
-    
+
     // get sum_inv value
     derived_witnesses.push(assignments.get_derived(index, left.len() * 2, 0));
-    
+
     let gadget = Inequality::new(right_lc, None);
     gadget.verify(verifier, &left, &derived_witnesses);
 }
@@ -336,10 +336,10 @@ fn set_membership_gadget(
     assignments: &Assignments,
     verifier: &mut VerifierBuffer,
     index: usize
-) {  
+) {
     let set_membership_parser = gadget_grammar::SetMembershipGadgetParser::new();
     let (member, set) = set_membership_parser.parse(&line).unwrap();
-    
+
     let member_lcs: Vec<LinearCombination> = match member {
         Var::Witness(_) => assignments.get_all_commitments(member.clone()).into_iter().map(|var| var.into()).collect(),
         Var::Instance(_) => be_to_scalars(&assignments.get_instance(member.clone(), None)).into_iter().map(|scalar| scalar.into()).collect(),
@@ -401,7 +401,7 @@ fn set_membership_gadget(
         member_lc = hashed_member_lc;
 
         witness_set_vars = Vec::new();
-        instance_set_lcs = Vec::new();            
+        instance_set_lcs = Vec::new();
 
         for element in set {
             match element {

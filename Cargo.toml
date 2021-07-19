@@ -22,13 +22,5 @@ features = ["yoloproofs", "avx2_backend"]
 [build-dependencies]
 lalrpop = "0.17.1"
 
-[[bin]]
-name = "prover"
-path = "src/bin/prover.rs"
-
-[[bin]]
-name = "verifier"
-path = "src/bin/verifier.rs"
-
 [[test]]
 name = "combine_gadgets"
