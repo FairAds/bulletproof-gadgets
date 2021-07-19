@@ -77,6 +77,7 @@ cargo run --bin merkle_root <name>
 ```
 
 Where `<name>` must be replaced with the name of the document that has both a `<name>.json` file and a `<name>.schema.json` file.
+This will create a new `<name>.metadata.json` file with the MerkleRoot in a `rootHash_hex` field.
 
 For example,
 
@@ -84,7 +85,7 @@ For example,
 cargo run --release --bin merkle_root custom_examples/passport-example
 ```
 
-The default console log level is set to `INFO`, however, for debugging purposes you can set the `RUST_LOG` environment variable
+The default console log level is set to `INFO`. However, for debugging purposes you can set the `RUST_LOG` environment variable
 to `DEBUG`, which will print the variables conversions and the multiple Merkle Tree hashing steps.
 ```
 RUST_LOG=DEBUG cargo run --release --bin merkle_root custom_examples/passport-example

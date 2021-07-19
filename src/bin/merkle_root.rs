@@ -8,24 +8,26 @@ extern crate log;
 extern crate env_logger;
 #[macro_use] extern crate bulletproofs_gadgets;
 #[macro_use] extern crate lalrpop_util;
+extern crate serde_json;
 
 use curve25519_dalek::scalar::Scalar;
 use bulletproofs_gadgets::merkle_root_hash::merkle_root::MerkleRoot;
 use bulletproofs_gadgets::mimc_hash::mimc::{mimc_hash};
 use bulletproofs_gadgets::conversions::{hex_to_bytes, scalar_to_hex, str_hex_encode, num_hex_encode};
-use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::{Pattern, Pattern::*};
+use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::{Pattern};
 use std::fs::File;
 use std::env;
 use regex::Regex;
+use serde_json::json;
 
 lalrpop_mod!(gadget_grammar, "/lalrpop/gadget_grammar.rs");
 
 const PROFILE_EXT: &str = ".json";
 const SCHEMA_EXT: &str = ".schema.json";
 const MERKLE_TREE_PATT: &str = "IS MERKLE ROOT OF ";
+const OUTPUT_EXT: &str = ".metadata.json";
 
-
-fn calc_merkle_root(witness_vars: Vec<String>, pattern: Pattern) {
+fn calc_merkle_root(witness_vars: Vec<String>, pattern: Pattern) -> String {
     let w_bytes: Vec<Vec<u8>> = witness_vars.iter().map(|x| hex_to_bytes(x.clone()).unwrap()).collect();
     log::debug!("Witnesses as byte vectors:");
     for x in w_bytes.iter() {
@@ -39,7 +41,9 @@ fn calc_merkle_root(witness_vars: Vec<String>, pattern: Pattern) {
     }
     let mut root_calculator = MerkleRoot::new();
     root_calculator.calculate_merkle_root(&w_hashed, &Vec::new(), pattern);
-    log::info!("Merkle Root hash: {}", root_calculator.get_merkle_root_hash());
+    let merkle_root = root_calculator.get_merkle_root_hash();
+    log::info!("Merkle Root hash: {}", merkle_root);
+    merkle_root
 }
 
 
@@ -110,6 +114,18 @@ fn get_witness_hex_literals(witnesses_data: &Vec<serde_json::Value>) -> Vec<Stri
     }
     witnesses_hex_literals
 }
+fn write_metadata_json(filename: &mut str, merkle_root: String) -> std::io::Result<()> {
+    let file = File::create(format!("{}{}", filename, OUTPUT_EXT))?;
+    let json  = json!({
+        "rootHash_hex": merkle_root
+    });
+    match serde_json::to_writer_pretty(file, &json) {
+        Err(e) => log::error!("unable to write .metadata.json file. Error: {:?}", e),
+        _ => ()
+    }
+    Ok(())
+}
+
 /// Assumptions for the .json  and .schema.json files:
 /// 1. The MerkleRoot statement is defined at the 'validationRule' in the .schema.json file.
 /// 2. The 'validationRule' field does not have any statement after the 'IS MERKLE ROOT OF'.
@@ -121,10 +137,8 @@ fn main() -> std::io::Result<()> {
     let filename = Box::leak(env::args().nth(1).expect("missing argument").into_boxed_str());
     let pattern = parse_schema_pattern(filename).expect("unable to read .schema.json file");
     let witness_vars = parse_json(filename).expect("unable to read .json file");
-    calc_merkle_root(witness_vars, pattern);
-
-    //println!("\n\n\n\n Passport Example:\n\n");
-    //merkle_root_calculation_passport_example();
+    let merkle_root = calc_merkle_root(witness_vars, pattern);
+    let _result = write_metadata_json(filename, merkle_root);
     Ok(())
 }
 
