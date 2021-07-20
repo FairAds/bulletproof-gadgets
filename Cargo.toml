@@ -1,3 +1,5 @@
+cargo-features = ["resolver"]
+
 [package]
 name = "bulletproofs_gadgets"
 version = "0.1.0"
