@@ -1,6 +1,6 @@
-FROM rust:1.53.0
+FROM rust:1.47-slim
 
-RUN rustup install nightly-2020-08-20 && rustup default nightly-2020-08-20
+RUN rustup install nightly-2020-09-20 && rustup set profile minimal && rustup default nightly-2020-09-20
 
 RUN mkdir -p /bulletproof-gadgets
 
@@ -11,4 +11,4 @@ COPY Cargo.toml ./Cargo.toml
 COPY src ./src
 COPY tests ./tests
 
-RUN cargo build --release && chmod +x ./tests/scripts/test_prover_verifier.sh
+RUN cargo build --bins --release && chmod +x ./tests/scripts/test_prover_verifier.sh
