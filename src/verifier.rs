@@ -29,6 +29,8 @@ use std::fs::File;
 use std::env;
 use std::panic;
 use self::math::round;
+use std::io::{Error, ErrorKind};
+
 
 // lalrpop parsers
 lalrpop_mod!(gadget_grammar, "/lalrpop/gadget_grammar.rs");
@@ -86,11 +88,11 @@ fn verify_proof(filename:  &'static str) -> std::io::Result<()> {
     match result {
         Err(_) => {
             println!("false");
-            std::process::exit(1)
+            Err(Error::new(ErrorKind::Other, "verification failed"))
         },
         _ => {
             println!("true");
-            std::process::exit(0)
+            Ok(())
         }
     }
 }

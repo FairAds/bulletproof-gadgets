@@ -21,6 +21,3 @@ features = ["yoloproofs", "avx2_backend"]
 
 [build-dependencies]
 lalrpop = "0.17.1"
-
-[[test]]
-name = "combine_gadgets"
