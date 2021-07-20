@@ -1,36 +1,34 @@
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate bulletproofs;
-#[macro_use] extern crate bulletproofs_gadgets;
-#[macro_use] extern crate lalrpop_util;
 extern crate math;
 
 use bulletproofs::r1cs::{Prover, LinearCombination, Variable, ConstraintSystem};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
-use bulletproofs_gadgets::gadget::Gadget;
-use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::MerkleTree256;
-use bulletproofs_gadgets::bounds_check::bounds_check_gadget::BoundsCheck;
-use bulletproofs_gadgets::mimc_hash::mimc_hash_gadget::MimcHash256;
-use bulletproofs_gadgets::mimc_hash::mimc::mimc_hash;
-use bulletproofs_gadgets::equality::equality_gadget::Equality;
-use bulletproofs_gadgets::less_than::less_than_gadget::LessThan;
-use bulletproofs_gadgets::set_membership::set_membership_gadget::SetMembership;
-use bulletproofs_gadgets::inequality::inequality_gadget::Inequality;
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, scalar_to_be};
-use bulletproofs_gadgets::lalrpop::ast::*;
-use bulletproofs_gadgets::lalrpop::assignment_parser::*;
-use bulletproofs_gadgets::commitments::commit_single;
-use bulletproofs_gadgets::cs_buffer::{ConstraintSystemBuffer, ProverBuffer, Operation};
-use bulletproofs_gadgets::or::or_conjunction::or;
+use gadget::Gadget;
+use merkle_tree::merkle_tree_gadget::MerkleTree256;
+use bounds_check::bounds_check_gadget::BoundsCheck;
+use mimc_hash::mimc_hash_gadget::MimcHash256;
+use mimc_hash::mimc::mimc_hash;
+use equality::equality_gadget::Equality;
+use less_than::less_than_gadget::LessThan;
+use set_membership::set_membership_gadget::SetMembership;
+use inequality::inequality_gadget::Inequality;
+use conversions::{be_to_scalar, be_to_scalars, scalar_to_be};
+use lalrpop::ast::*;
+use lalrpop::assignment_parser::*;
+use commitments::commit_single;
+use cs_buffer::{ConstraintSystemBuffer, ProverBuffer, Operation};
+use or::or_conjunction::or;
 
 use std::io::prelude::*;
 use std::io::{BufReader, Lines};
 use std::iter::{Peekable, Enumerate};
 use std::fs::File;
 use std::env;
-use math::round;
+use self::math::round;
 
 // lalrpop parsers
 lalrpop_mod!(gadget_grammar, "/lalrpop/gadget_grammar.rs");
@@ -44,10 +42,7 @@ fn round_pow2(num: usize) -> usize {
     2_usize.pow(round::ceil((num as f64).log2(), 0) as u32)
 }
 
-fn main() -> std::io::Result<()> {
-    // ---------- COLLECT CMD LINE ARGUMENTS ----------
-    let filename = Box::leak(env::args().nth(1).expect("missing argument").into_boxed_str());
-
+fn generate_proof(filename:  &'static str) -> std::io::Result<()> {
     // ---------- CREATE PROVER ----------
     let mut transcript = Transcript::new(filename.as_bytes());
     let pc_gens = PedersenGens::default();
@@ -97,6 +92,10 @@ fn main() -> std::io::Result<()> {
     file.write_all(&proof.to_bytes())?;
 
     Ok(())
+}
+
+pub fn prove(filename:  &'static str) -> bool {
+    return generate_proof(filename).is_ok();
 }
 
 fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &ProverBuffer) {
