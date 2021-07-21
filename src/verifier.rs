@@ -97,7 +97,8 @@ fn verify_proof(filename:  &'static str) -> std::io::Result<()> {
     }
 }
 
-pub fn verify(filename:  &'static str) -> bool {
+#[no_mangle]
+pub extern fn verify(filename:  &'static str) -> bool {
     return verify_proof(filename).is_ok();
 }
 

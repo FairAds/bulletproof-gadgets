@@ -94,7 +94,8 @@ fn generate_proof(filename:  &'static str) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn prove(filename:  &'static str) -> bool {
+#[no_mangle]
+pub extern fn prove(filename:  &'static str) -> bool {
     return generate_proof(filename).is_ok();
 }
 
