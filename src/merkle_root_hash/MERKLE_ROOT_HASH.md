@@ -93,7 +93,7 @@ RUST_LOG=DEBUG cargo run --release --bin merkle_root custom_examples/passport-ex
 
 **IMPORTANT:** The `.json` and `.schema.json` files that can successfully run this script
 must adhere to the following restrictions:
-1. The MerkleRoot statement IS defined at the `validationRule` in the `.schema.json` file.
+1. The MerkleRoot statement IS defined in the `validationRule` at the `.schema.json` file.
 2. The `validationRule` field does not have any statement after the `IS MERKLE ROOT OF` premise.
 3. Only `private` fields are used in the MerkleTree pattern definition.
-4. The number and order of fields in the `.json` file is the same as the ones used in the `validationRule`.
+4. All the fields in the `validationRule` are defined in the same structure in the `.json` file.

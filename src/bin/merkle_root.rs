@@ -47,36 +47,12 @@ fn calc_merkle_root(witness_vars: Vec<String>, pattern: Pattern) -> String {
 }
 
 
-fn parse_witness_values(json: &serde_json::Value, witnesses_values: &mut Vec<serde_json::Value>) {
-    for (key, value) in json.as_object().unwrap() {
-        log::debug!("{:?} ===> {:?}", key, value);
-        if !value.is_object() {
-            witnesses_values.push(value.clone());
-        }
-        else{
-            parse_witness_values(value, witnesses_values);
-        }
-    }
-}
-
-fn parse_json(filename: &str) -> std::io::Result<Vec<String>> {
-    let file = File::open(format!("{}{}", filename, PROFILE_EXT))?;
-    let json: serde_json::Value = serde_json::from_reader(file)?;
-    let mut witnesses_values: Vec<serde_json::Value> = Vec::new();
-    parse_witness_values(&json, &mut witnesses_values);
-    Ok(get_witness_hex_literals(&witnesses_values))
-}
-
-fn get_hash_pattern_from_str(pattern_str: String) -> Pattern{
+fn parse_hash_pattern(pattern_str: String) -> Pattern{
     let re = Regex::new(r"[A-Za-z.\s]+").unwrap();
     let mut result = re.replace_all(pattern_str.as_str(), "").replace("(,)", "(W W)");
     while result.contains(','){
         result = result.replace(",", " ");
     }
-    /* This takes an unnumbered pattern of witnesses and numerates form left to right.
-    *  The assumption is that the fields in the validation rule come in the same order as they
-    *  are in the .json file.
-    */
     let mut witness_index = 0;
     let mut witness_pattern: String = String::new();
     for c in result.chars() {
@@ -92,14 +68,36 @@ fn get_hash_pattern_from_str(pattern_str: String) -> Pattern{
     let (_, _, pattern) = tree_parser.parse(witness_pattern.as_str()).unwrap();
     pattern
 }
-fn parse_schema_pattern(filename: &str) -> std::io::Result<Pattern> {
+
+fn parse_witnesses_values(json: &serde_json::Value, json_fields: &Vec<&str>, witnesses_values: &mut Vec<serde_json::Value>) {
+    log::debug!("Json Witness Values: ");
+    for key in json_fields.iter(){
+        let pointer_key = format!("/{}",key.replace(".", "/"));
+        let value = json.pointer(pointer_key.as_str()).unwrap();
+        log::debug!("{:?} ===> {:?}", pointer_key, value);
+        witnesses_values.push(value.clone())
+    }
+}
+fn parse_input(filename: &str) -> std::io::Result<(Pattern, Vec<String>)> {
+    // Extract MerkleTree Pattern .schema.json from its validation rule.
     let file = File::open(format!("{}{}", filename, SCHEMA_EXT))?;
     let json: serde_json::Value = serde_json::from_reader(file)?;
     let validation_rule_split = json.get("validationRule").unwrap().as_str().unwrap().split(MERKLE_TREE_PATT);
     let rule_parts: Vec<&str> = validation_rule_split.collect();
-    let fields_pattern = rule_parts.last().unwrap().clone().replace("private.", "");
-    log::debug!("fields_pattern: {}", fields_pattern);
-    Ok(get_hash_pattern_from_str(fields_pattern))
+    let fields_pattern : String = rule_parts.last().unwrap().clone().replace("private.", "");
+    let pattern: Pattern = parse_hash_pattern(fields_pattern.clone());
+    log::debug!("MerkleTree Pattern: {}", pattern);
+    // Get the .json fields to extract in the same order as the MerkleTree Pattern
+    let fields_keys = fields_pattern.clone().replace(&['(', ')', ' '][..], "");
+    let fields_keys_split = fields_keys.split(',');
+    let json_fields: Vec<&str> = fields_keys_split.collect();
+    log::debug!("Ordered MerkleTree Fields = {:?}", json_fields);
+    // Parse the witness values from  the .json file using the MerkleTree Pattern ordered fields.
+    let file = File::open(format!("{}{}", filename, PROFILE_EXT))?;
+    let json: serde_json::Value = serde_json::from_reader(file)?;
+    let mut witnesses_values: Vec<serde_json::Value> = Vec::new();
+    parse_witnesses_values(&json, &json_fields, &mut witnesses_values);
+    Ok((pattern, get_witness_hex_literals(&witnesses_values)))
 }
 
 fn get_witness_hex_literals(witnesses_data: &Vec<serde_json::Value>) -> Vec<String> {
@@ -130,13 +128,12 @@ fn write_metadata_json(filename: &mut str, merkle_root: String) -> std::io::Resu
 /// 1. The MerkleRoot statement is defined at the 'validationRule' in the .schema.json file.
 /// 2. The 'validationRule' field does not have any statement after the 'IS MERKLE ROOT OF'.
 /// 3. Only private fields are used for the MerkleRoot validation.
-/// 4. The number and order of fields in the .json file is the same as the ones in the validationRule.
+/// 4. All the fields in the validationRule are defined in the same structure in the .json file.
 fn main() -> std::io::Result<()> {
     env_logger::init_from_env(
     env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"));
     let filename = Box::leak(env::args().nth(1).expect("missing argument").into_boxed_str());
-    let pattern = parse_schema_pattern(filename).expect("unable to read .schema.json file");
-    let witness_vars = parse_json(filename).expect("unable to read .json file");
+    let (pattern, witness_vars) = parse_input(filename).expect("cannot read .json or .schema.json files");
     let merkle_root = calc_merkle_root(witness_vars, pattern);
     let _result = write_metadata_json(filename, merkle_root);
     Ok(())
