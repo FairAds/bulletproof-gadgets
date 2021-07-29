@@ -26,3 +26,6 @@ lalrpop = "0.17.1"
 [target.'cfg(target_os="android")'.dependencies]
 # jni = { version = "0.5", default-features = false }
 jni = "0.19.0"
+
+[lib]
+crate_type = ["cdylib", "rlib"]
