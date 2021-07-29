@@ -39,6 +39,7 @@ pub mod utils;
 pub mod lalrpop;
 pub mod prover;
 pub mod verifier;
+pub mod c_prover;
 
 #[cfg(target_os="android")]
 #[allow(non_snake_case)]
