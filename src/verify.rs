@@ -1,82 +1,63 @@
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate bulletproofs;
-#[macro_use] extern crate bulletproofs_gadgets;
-#[macro_use] extern crate lalrpop_util;
 extern crate regex;
 extern crate math;
 
 use bulletproofs::r1cs::{Verifier, Variable, R1CSProof, LinearCombination, ConstraintSystem};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use merlin::Transcript;
-use bulletproofs_gadgets::gadget::Gadget;
-use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::MerkleTree256;
-use bulletproofs_gadgets::bounds_check::bounds_check_gadget::BoundsCheck;
-use bulletproofs_gadgets::mimc_hash::mimc_hash_gadget::MimcHash256;
-use bulletproofs_gadgets::mimc_hash::mimc::mimc_hash;
-use bulletproofs_gadgets::equality::equality_gadget::Equality;
-use bulletproofs_gadgets::set_membership::set_membership_gadget::SetMembership;
-use bulletproofs_gadgets::less_than::less_than_gadget::LessThan;
-use bulletproofs_gadgets::inequality::inequality_gadget::Inequality;
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars};
-use bulletproofs_gadgets::lalrpop::ast::*;
-use bulletproofs_gadgets::lalrpop::assignment_parser::*;
-use bulletproofs_gadgets::cs_buffer::{ConstraintSystemBuffer, VerifierBuffer, Operation};
-use bulletproofs_gadgets::or::or_conjunction::or;
+use gadget::Gadget;
+use merkle_tree::merkle_tree_gadget::MerkleTree256;
+use bounds_check::bounds_check_gadget::BoundsCheck;
+use mimc_hash::mimc_hash_gadget::MimcHash256;
+use mimc_hash::mimc::mimc_hash;
+use equality::equality_gadget::Equality;
+use set_membership::set_membership_gadget::SetMembership;
+use less_than::less_than_gadget::LessThan;
+use inequality::inequality_gadget::Inequality;
+use conversions::{be_to_scalar, be_to_scalars};
+use lalrpop::ast::*;
+use lalrpop::assignment_parser::*;
+use cs_buffer::{ConstraintSystemBuffer, VerifierBuffer, Operation};
+use or::or_conjunction::or;
 
-use std::io::prelude::*;
-use std::io::{BufReader, Lines};
 use std::iter::{Peekable, Enumerate};
-use std::fs::File;
-use std::env;
 use std::panic;
-use math::round;
+use self::math::round;
 
 // lalrpop parsers
 lalrpop_mod!(gadget_grammar, "/lalrpop/gadget_grammar.rs");
-
-// file extensions
-const GADGETS_EXT: &str = ".gadgets";
-const PROOF_EXT: &str = ".proof";
 
 fn round_pow2(num: usize) -> usize {
     2_usize.pow(round::ceil((num as f64).log2(), 0) as u32)
 }
 
-fn main() -> std::io::Result<()> {
-    // ---------- COLLECT CMD LINE ARGUMENTS ----------
-    let filename = Box::leak(env::args().nth(1).expect("missing argument").into_boxed_str());
-
+pub fn verify(
+    name: &'static str,
+    instance: String,
+    proof: Vec<u8>,
+    commitments: String,
+    gadgets: String
+) -> std::io::Result<bool> {
     // ---------- CREATE VERIFIER ----------
-    let mut verifier_transcript = Transcript::new(filename.as_bytes());
+    let mut verifier_transcript = Transcript::new(name.as_bytes());
     let pc_gens = PedersenGens::default();
     let mut verifier = Verifier::new(&mut verifier_transcript);
-    
+
     // ---------- CREATE BUFFER ----------
     let mut buffer_transcript = Transcript::new(b"BufferTranscript");
     let buffer_verifier = Verifier::new(&mut buffer_transcript);
     let mut verifier_buffer = VerifierBuffer::new(buffer_verifier);
 
-    // ---------- PRASE .proof FILE ----------
-    let mut file = File::open(format!("{}{}", filename, PROOF_EXT))?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-    let proof = R1CSProof::from_bytes(&buffer[..]).unwrap();
-
+    let proof = R1CSProof::from_bytes(&proof).unwrap();
     let mut assignments = Assignments::new();
-
-    // ---------- PARSE .inst FILE ----------
-    assignments.parse_inst(filename.to_string()).expect("unable not read .inst file");
-
-    // ---------- PARSE .coms FILE ----------
-    assignments.parse_coms(filename.to_string(), &mut verifier).expect("unable not read .coms file");
-
-    // ---------- PARSE .gadgets FILE ----------
-    let file = File::open(format!("{}{}", filename, GADGETS_EXT))?;
-    let mut iter = BufReader::new(file).lines().enumerate().into_iter().peekable();
+    assignments.parse_instance(instance).expect("unable to parse provided instance");
+    assignments.parse_commitments(commitments, &mut verifier).expect("unable to parse provided commitments");
+    let mut iter = gadgets.lines().enumerate().into_iter().peekable();
     while iter.peek().is_some() {
         let (index, line) = iter.next().unwrap();
-        let line = line.unwrap();
+        let line = line;
 
         let local_initialization = vec![verifier_buffer.buffer().into_iter().map(|op| op.clone()).collect()];
         parse_conjunction(&mut iter, &line, &assignments, &mut verifier_buffer, local_initialization);
@@ -88,16 +69,7 @@ fn main() -> std::io::Result<()> {
     // ---------- VERIFY PROOF ----------
     let bp_gens = BulletproofGens::new(round_pow2(verifier.get_num_vars()), 1);
     let result = verifier.verify(&proof, &pc_gens, &bp_gens);
-    match result {
-        Err(_) => {
-            println!("false");
-            std::process::exit(1)
-        },
-        _ => {
-            println!("true");
-            std::process::exit(0)
-        }
-    }
+    Ok(result.is_ok())
 }
 
 fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &VerifierBuffer) {
@@ -106,7 +78,7 @@ fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &VerifierBuffer) {
             Operation::Multiply((left, right)) => {
                 main.multiply(left.clone(), right.clone());
             },
-            Operation::AllocateMultiplier(assignment) => { 
+            Operation::AllocateMultiplier(assignment) => {
                 assert!(main.allocate_multiplier(assignment.clone()).is_ok());
             },
             Operation::Constrain(lc) => {
@@ -118,12 +90,12 @@ fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &VerifierBuffer) {
 }
 
 fn parse_gadget(
-    line: &String,
+    line: &str,
     assignments: &Assignments,
     verifier: &mut VerifierBuffer,
     index: usize
 ) {
-    match get_gadget_op(line) {
+    match get_gadget_op(&String::from(line)) {
         GadgetOp::Bound => bounds_check_gadget(line, assignments, verifier, index),
         GadgetOp::Hash => mimc_hash_gadget(line, assignments, verifier, index),
         GadgetOp::Merkle => merkle_tree_gadget(line, assignments, verifier, index),
@@ -136,13 +108,13 @@ fn parse_gadget(
 }
 
 fn parse_conjunction(
-    iter: &mut Peekable<Enumerate<Lines<BufReader<File>>>>,
-    line: &String,
+    iter: &mut Peekable<Enumerate<std::str::Lines>>,
+    line: &str,
     assignments: &Assignments,
     verifier: &mut VerifierBuffer,
     initialization: Vec<Vec<Operation>>
 ) {
-    match get_gadget_op(line) {
+    match get_gadget_op(&String::from(line)) {
         GadgetOp::Or => or_conjunction(iter, assignments, verifier, initialization),
         _ => {}
     }
@@ -155,7 +127,7 @@ fn get_gadget_op(line: &String) -> GadgetOp {
 }
 
 fn or_conjunction(
-    iter: &mut Peekable<Enumerate<Lines<BufReader<File>>>>,
+    iter: &mut Peekable<Enumerate<std::str::Lines>>,
     assignments: &Assignments,
     verifier: &mut VerifierBuffer,
     initialization: Vec<Vec<Operation>>
@@ -171,8 +143,7 @@ fn or_conjunction(
 
     while iter.peek().is_some() {
         let (local_index, line) = iter.next().unwrap();
-        let line = line.unwrap();
-        let gadget_op = get_gadget_op(&line);
+        let gadget_op = get_gadget_op(&String::from(line));
         if gadget_op.is_array_end() { break; }
         if gadget_op.is_block_end() { verifier_buffer.rewind(); }
         else {
@@ -194,7 +165,7 @@ fn bounds_check_gadget(
 ) {
     let bound_parser = gadget_grammar::BoundGadgetParser::new();
     let (var, min, max) = bound_parser.parse(&line).unwrap();
-    
+
     let var = assignments.get_commitment(var, 0);
     let min: Vec<u8> = assignments.get_instance(min, Some(&assert_32));
     let max: Vec<u8> = assignments.get_instance(max, Some(&assert_32));
@@ -248,7 +219,7 @@ fn merkle_tree_gadget(
 
     let instance_vars: Vec<LinearCombination> = instance_vars.into_iter()
         .map(|var| hash_instance(var, &assignments)).collect();
-    
+
     let mut hash_number = 0;
     let witness_vars: Vec<LinearCombination> = witness_vars.into_iter()
         .map(|var| {
@@ -256,7 +227,7 @@ fn merkle_tree_gadget(
             hash_number += 1;
             image_var.into()
         }).collect();
-    
+
     let gadget = MerkleTree256::new(root.into(), instance_vars, witness_vars, pattern.clone());
     gadget.verify(verifier, &Vec::new(), &Vec::new());
 }
@@ -268,15 +239,15 @@ fn equality_gadget(
 ) {
     let equality_parser = gadget_grammar::EqualityGadgetParser::new();
     let (left, right) = equality_parser.parse(&line).unwrap();
-    
+
     let left = assignments.get_all_commitments(left);
-    
+
     let right: Vec<LinearCombination> = match right {
         Var::Witness(_) => assignments.get_all_commitments(right).into_iter().map(|var| var.into()).collect(),
         Var::Instance(_) => be_to_scalars(&assignments.get_instance(right, None)).into_iter().map(|scalar| scalar.into()).collect(),
         _ => panic!("invalid state")
     };
-    
+
     let gadget = Equality::new(right);
     gadget.verify(verifier, &left, &Vec::new());
 }
@@ -289,13 +260,13 @@ fn less_than_gadget(
 ) {
     let less_than_parser = gadget_grammar::LessThanGadgetParser::new();
     let (left, right) = less_than_parser.parse(&line).unwrap();
-    
+
     let left = assignments.get_commitment(left, 0);
     let right = assignments.get_commitment(right, 0);
-    
+
     let delta = assignments.get_derived(index, 0, 0);
     let delta_inv = assignments.get_derived(index, 1, 0);
-    
+
     let gadget = LessThan::new(left.into(), None, right.into(), None);
     gadget.verify(verifier, &Vec::new(), &vec![delta, delta_inv]);
 }
@@ -308,25 +279,25 @@ fn inequality_gadget(
 ) {
     let inequality_parser = gadget_grammar::InequalityGadgetParser::new();
     let (left, right) = inequality_parser.parse(&line).unwrap();
-    
+
     let left: Vec<Variable> = assignments.get_all_commitments(left);
-    
+
     let right_lc: Vec<LinearCombination> = match right {
         Var::Witness(_) => assignments.get_all_commitments(right).into_iter().map(|var| var.into()).collect(),
         Var::Instance(_) => be_to_scalars(&assignments.get_instance(right, None)).into_iter().map(|scalar| scalar.into()).collect(),
         _ => panic!("invalid state")
     };
-    
+
     let mut derived_witnesses: Vec<Variable> = Vec::new();
-    
+
     // get delta and delta_inv values
     for i in 0..(left.len() * 2) {
         derived_witnesses.push(assignments.get_derived(index, i, 0));
     }
-    
+
     // get sum_inv value
     derived_witnesses.push(assignments.get_derived(index, left.len() * 2, 0));
-    
+
     let gadget = Inequality::new(right_lc, None);
     gadget.verify(verifier, &left, &derived_witnesses);
 }
@@ -336,10 +307,10 @@ fn set_membership_gadget(
     assignments: &Assignments,
     verifier: &mut VerifierBuffer,
     index: usize
-) {  
+) {
     let set_membership_parser = gadget_grammar::SetMembershipGadgetParser::new();
     let (member, set) = set_membership_parser.parse(&line).unwrap();
-    
+
     let member_lcs: Vec<LinearCombination> = match member {
         Var::Witness(_) => assignments.get_all_commitments(member.clone()).into_iter().map(|var| var.into()).collect(),
         Var::Instance(_) => be_to_scalars(&assignments.get_instance(member.clone(), None)).into_iter().map(|scalar| scalar.into()).collect(),
@@ -401,7 +372,7 @@ fn set_membership_gadget(
         member_lc = hashed_member_lc;
 
         witness_set_vars = Vec::new();
-        instance_set_lcs = Vec::new();            
+        instance_set_lcs = Vec::new();
 
         for element in set {
             match element {

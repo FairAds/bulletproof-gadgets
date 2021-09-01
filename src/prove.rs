@@ -1,67 +1,54 @@
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate bulletproofs;
-#[macro_use] extern crate bulletproofs_gadgets;
-#[macro_use] extern crate lalrpop_util;
 extern crate math;
 
 use bulletproofs::r1cs::{Prover, LinearCombination, Variable, ConstraintSystem};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
-use bulletproofs_gadgets::gadget::Gadget;
-use bulletproofs_gadgets::merkle_tree::merkle_tree_gadget::MerkleTree256;
-use bulletproofs_gadgets::bounds_check::bounds_check_gadget::BoundsCheck;
-use bulletproofs_gadgets::mimc_hash::mimc_hash_gadget::MimcHash256;
-use bulletproofs_gadgets::mimc_hash::mimc::mimc_hash;
-use bulletproofs_gadgets::equality::equality_gadget::Equality;
-use bulletproofs_gadgets::less_than::less_than_gadget::LessThan;
-use bulletproofs_gadgets::set_membership::set_membership_gadget::SetMembership;
-use bulletproofs_gadgets::inequality::inequality_gadget::Inequality;
-use bulletproofs_gadgets::conversions::{be_to_scalar, be_to_scalars, scalar_to_be};
-use bulletproofs_gadgets::lalrpop::ast::*;
-use bulletproofs_gadgets::lalrpop::assignment_parser::*;
-use bulletproofs_gadgets::commitments::commit_single;
-use bulletproofs_gadgets::cs_buffer::{ConstraintSystemBuffer, ProverBuffer, Operation};
-use bulletproofs_gadgets::or::or_conjunction::or;
 
-use std::io::prelude::*;
-use std::io::{BufReader, Lines};
+use gadget::Gadget;
+use merkle_tree::merkle_tree_gadget::MerkleTree256;
+use bounds_check::bounds_check_gadget::BoundsCheck;
+use mimc_hash::mimc_hash_gadget::MimcHash256;
+use mimc_hash::mimc::mimc_hash;
+use equality::equality_gadget::Equality;
+use less_than::less_than_gadget::LessThan;
+use set_membership::set_membership_gadget::SetMembership;
+use inequality::inequality_gadget::Inequality;
+use conversions::{be_to_scalar, be_to_scalars, scalar_to_be};
+use lalrpop::ast::*;
+use lalrpop::assignment_parser::*;
+use commitments::commit_single;
+use cs_buffer::{ConstraintSystemBuffer, ProverBuffer, Operation};
+use or::or_conjunction::or;
+
 use std::iter::{Peekable, Enumerate};
-use std::fs::File;
-use std::env;
-use math::round;
+use self::math::round;
 
 // lalrpop parsers
 lalrpop_mod!(gadget_grammar, "/lalrpop/gadget_grammar.rs");
-
-// file extensions
-const GADGETS_EXT: &str = ".gadgets";
-const PROOF_EXT: &str = ".proof";
-const COMMITMENTS_EXT: &str = ".coms";
 
 fn round_pow2(num: usize) -> usize {
     2_usize.pow(round::ceil((num as f64).log2(), 0) as u32)
 }
 
-fn main() -> std::io::Result<()> {
-    // ---------- COLLECT CMD LINE ARGUMENTS ----------
-    let filename = Box::leak(env::args().nth(1).expect("missing argument").into_boxed_str());
-
+pub fn prove(
+    name: &'static str,
+    instance: String,
+    witness: String,
+    gadgets: String,
+    commitments: &mut String
+) -> std::result::Result<std::vec::Vec<u8>, Box<dyn std::error::Error>> {
     // ---------- CREATE PROVER ----------
-    let mut transcript = Transcript::new(filename.as_bytes());
+    let mut transcript = Transcript::new(name.as_bytes());
     let pc_gens = PedersenGens::default();
     let mut prover = Prover::new(&pc_gens, &mut transcript);
 
     let mut assignments = Assignments::new();
-
-    let mut coms_file = File::create(format!("{}{}", filename, COMMITMENTS_EXT))?;
-    
-    // ---------- PARSE .inst FILE ----------
-    assignments.parse_inst(filename.to_string()).expect("unable not read .inst file");
-    
-    // ---------- PARSE .wtns FILE, WRITE .coms FILE ----------
-    assignments.parse_wtns(filename.to_string(), &mut prover, &mut coms_file).expect("could not read .wtns file");
+    assignments.parse_instance(instance).expect("unable to parse provided instance");
+    assignments.parse_witness(witness, &mut prover, commitments).expect("unable to parse provided witness");
 
     // ---------- CREATE BUFFER ----------
     let buffer_gens = PedersenGens::default();
@@ -72,19 +59,18 @@ fn main() -> std::io::Result<()> {
     assignments.buffer_commit_drvd(&mut prover_buffer);
 
     // ---------- GADGETS ----------
-    let file = File::open(format!("{}{}", filename, GADGETS_EXT))?;
-    let mut iter = BufReader::new(file).lines().enumerate().into_iter().peekable();
+    let mut iter = gadgets.lines().enumerate().into_iter().peekable();
     while iter.peek().is_some() {
         let (index, line) = iter.next().unwrap();
-        let line = line.unwrap();
-    
+        let line = line;
+
         let local_initialization = vec![prover_buffer.buffer().into_iter().map(|op| op.clone()).collect()];
-        parse_conjunction(&mut iter, &line, &mut assignments, &mut prover, &mut prover_buffer, &mut coms_file, local_initialization);
-        parse_gadget(&line, &mut assignments, &mut prover, &mut prover_buffer, index, &mut coms_file);
+        parse_conjunction(&mut iter, &line, &mut assignments, &mut prover, &mut prover_buffer, commitments, local_initialization);
+        parse_gadget(&line, &mut assignments, &mut prover, &mut prover_buffer, index, commitments);
     }
 
     assign_buffer(&mut prover, &prover_buffer);
-    
+
     // output number of constraints
     println!("{}", prover.num_constraints());
 
@@ -92,11 +78,7 @@ fn main() -> std::io::Result<()> {
     let bp_gens = BulletproofGens::new(round_pow2(prover.get_num_multiplications()), 1);
     let proof = prover.prove(&bp_gens).unwrap();
 
-    // ---------- WRITE PROOF TO FILE ----------
-    let mut file = File::create(format!("{}{}", filename, PROOF_EXT))?;
-    file.write_all(&proof.to_bytes())?;
-
-    Ok(())
+    Ok(proof.to_bytes())
 }
 
 fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &ProverBuffer) {
@@ -105,7 +87,7 @@ fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &ProverBuffer) {
             Operation::Multiply((left, right)) => {
                 main.multiply(left.clone(), right.clone());
             },
-            Operation::AllocateMultiplier(assignment) => { 
+            Operation::AllocateMultiplier(assignment) => {
                 assert!(main.allocate_multiplier(assignment.clone()).is_ok());
             },
             Operation::Constrain(lc) => {
@@ -117,36 +99,36 @@ fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &ProverBuffer) {
 }
 
 fn parse_gadget(
-    line: &String,
+    line: &str,
     assignments: &mut Assignments,
     prover: &mut Prover,
     prover_buffer: &mut ProverBuffer,
     index: usize,
-    coms_file: &mut File
+    commitments: &mut String
 ) {
-    match get_gadget_op(line) {
-        GadgetOp::Bound => bounds_check_gadget(line, assignments, prover, prover_buffer, index, coms_file),
-        GadgetOp::Hash => mimc_hash_gadget(line, assignments, prover, prover_buffer, index, coms_file),
-        GadgetOp::Merkle => merkle_tree_gadget(line, assignments, prover, prover_buffer, index, coms_file),
+    match get_gadget_op(&String::from(line)) {
+        GadgetOp::Bound => bounds_check_gadget(line, assignments, prover, prover_buffer, index, commitments),
+        GadgetOp::Hash => mimc_hash_gadget(line, assignments, prover, prover_buffer, index, commitments),
+        GadgetOp::Merkle => merkle_tree_gadget(line, assignments, prover, prover_buffer, index, commitments),
         GadgetOp::Equality => equality_gadget(line, assignments, prover_buffer),
-        GadgetOp::LessThan => less_than_gadget(line, assignments, prover, prover_buffer, index, coms_file),
-        GadgetOp::Inequality => inequality_gadget(line, assignments, prover, prover_buffer, index, coms_file),
-        GadgetOp::SetMembership => set_membership_gadget(line, assignments, prover, prover_buffer, index, coms_file),
+        GadgetOp::LessThan => less_than_gadget(line, assignments, prover, prover_buffer, index, commitments),
+        GadgetOp::Inequality => inequality_gadget(line, assignments, prover, prover_buffer, index, commitments),
+        GadgetOp::SetMembership => set_membership_gadget(line, assignments, prover, prover_buffer, index, commitments),
         _ => {}
     }
 }
 
 fn parse_conjunction(
-    iter: &mut Peekable<Enumerate<Lines<BufReader<File>>>>,
-    line: &String,
+    iter: &mut Peekable<Enumerate<std::str::Lines>>,
+    line: &str,
     assignments: &mut Assignments,
     prover: &mut Prover,
     prover_buffer: &mut ProverBuffer,
-    coms_file: &mut File,
+    commitments: &mut String,
     initialization: Vec<Vec<Operation>>
 ) {
-    match get_gadget_op(line) {
-        GadgetOp::Or => or_conjunction(iter, assignments, prover, prover_buffer, coms_file, initialization),
+    match get_gadget_op(&String::from(line)) {
+        GadgetOp::Or => or_conjunction(iter, assignments, prover, prover_buffer, commitments, initialization),
         _ => {}
     }
 }
@@ -164,7 +146,7 @@ fn hash_witness(
     assignments: &mut Assignments,
     index: usize,
     subroutine: usize,
-    coms_file: &mut File
+    commitments: &mut String
 ) -> (Scalar, Variable) {
     let mut hash_commitments = Vec::new();
     let (preimage_scalars, _, preimage_vars, preimage_bytes) = assignments.get_witness(var, None);
@@ -184,8 +166,8 @@ fn hash_witness(
     derived_coms.into_iter().for_each(|com| hash_commitments.push(com));
 
     assignments.cache_derived_wtns(derived_wtns);
-    assignments.parse_derived_wtns(hash_commitments.clone(), index, subroutine, coms_file).expect("unable to write .coms file");
-    
+    assignments.parse_derived_witness(hash_commitments.clone(), index, subroutine, commitments).expect("unable to generate commitments");
+
     (image_scalar, image_var)
 }
 
@@ -200,11 +182,11 @@ fn hash_instance(
 }
 
 fn or_conjunction(
-    iter: &mut Peekable<Enumerate<Lines<BufReader<File>>>>,
+    iter: &mut Peekable<Enumerate<std::str::Lines>>,
     assignments: &mut Assignments,
     prover: &mut Prover,
     parent_prover_buffer: &mut ProverBuffer,
-    coms_file: &mut File,
+    commitments: &mut String,
     initialization: Vec<Vec<Operation>>
 ) {
     let or_gens = PedersenGens::default();
@@ -214,22 +196,22 @@ fn or_conjunction(
     assignments.buffer_commit_wtns(&mut prover_buffer);
     assignments.buffer_commit_drvd(&mut prover_buffer);
     prover_buffer.initialize_from(initialization.clone());
-    
+
     if iter.peek().is_none() {
         panic!("unexpected end of input");
     }
 
     while iter.peek().is_some() {
         let (local_index, line) = iter.next().unwrap();
-        let line = line.unwrap();
-        let gadget_op = get_gadget_op(&line);
+        let line = line;
+        let gadget_op = get_gadget_op(&String::from(line));
         if gadget_op.is_array_end() { break; }
         if gadget_op.is_block_end() { prover_buffer.rewind(); }
         else {
             let mut local_initialization: Vec<Vec<Operation>> = initialization.clone();
             local_initialization.push(prover_buffer.buffer().into_iter().map(|op| op.clone()).collect());
-            parse_conjunction(iter, &line, assignments, prover, &mut prover_buffer, coms_file, local_initialization);
-            parse_gadget(&line, assignments, prover, &mut prover_buffer, local_index, coms_file);
+            parse_conjunction(iter, &line, assignments, prover, &mut prover_buffer, commitments, local_initialization);
+            parse_gadget(&line, assignments, prover, &mut prover_buffer, local_index, commitments);
         }
     }
 
@@ -256,15 +238,15 @@ fn bounds_check_gadget(
     prover: &mut Prover,
     prover_buffer: &mut ProverBuffer,
     index: usize,
-    coms_file: &mut File
+    commitments: &mut String
 ) {
     let bound_parser = gadget_grammar::BoundGadgetParser::new();
     let (var, min, max) = bound_parser.parse(line).unwrap();
-    
+
     let var = assignments.get_witness(var, Some(&assert_witness_32));
     let min: Vec<u8> = assignments.get_instance(min, Some(&assert_32));
     let max: Vec<u8> = assignments.get_instance(max, Some(&assert_32));
-    
+
     let gadget = BoundsCheck::new(&min, &max);
 
     let (derived_coms, derived_wtns) = gadget.setup(prover, &var.0);
@@ -272,7 +254,7 @@ fn bounds_check_gadget(
     gadget.prove(prover_buffer, &var.2, &derived_wtns);
 
     assignments.cache_derived_wtns(derived_wtns);
-    assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
+    assignments.parse_derived_witness(derived_coms, index, 0, commitments).expect("unable to generate commitments");
 }
 
 fn mimc_hash_gadget(
@@ -281,7 +263,7 @@ fn mimc_hash_gadget(
     prover: &mut Prover,
     prover_buffer: &mut ProverBuffer,
     index: usize,
-    coms_file: &mut File
+    commitments: &mut String
 ) {
     let hash_parser = gadget_grammar::HashGadgetParser::new();
     let (image, preimage) = hash_parser.parse(line).unwrap();
@@ -296,12 +278,12 @@ fn mimc_hash_gadget(
 
     let gadget = MimcHash256::new(image);
     let (derived_coms, derived_wtns) = gadget.setup(prover, &preimage.0);
-    
+
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &preimage.2, &derived_wtns);
 
     assignments.cache_derived_wtns(derived_wtns);
-    assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
+    assignments.parse_derived_witness(derived_coms, index, 0, commitments).expect("unable to generate commitments");
 }
 
 fn merkle_tree_gadget(
@@ -310,7 +292,7 @@ fn merkle_tree_gadget(
     prover: &mut Prover,
     prover_buffer: &mut ProverBuffer,
     index: usize,
-    coms_file: &mut File
+    commitments: &mut String
 ) {
     let merkle_parser = gadget_grammar::MerkleGadgetParser::new();
     let (root, instance_vars, witness_vars, pattern) = merkle_parser.parse(line).unwrap();
@@ -328,13 +310,13 @@ fn merkle_tree_gadget(
     let mut witness_lcs: Vec<LinearCombination> = Vec::new();
 
     for witness_var in witness_vars {
-        let (_, var) = hash_witness(prover, prover_buffer, witness_var, assignments, index, hash_number, coms_file);
+        let (_, var) = hash_witness(prover, prover_buffer, witness_var, assignments, index, hash_number, commitments);
         hash_number += 1;
         witness_lcs.push(var.into());
     }
 
     let gadget = MerkleTree256::new(root, instance_vars, witness_lcs, pattern.clone());
-        
+
     gadget.prove(prover_buffer, &Vec::new(), &Vec::new());
 }
 
@@ -353,9 +335,9 @@ fn equality_gadget(
         Var::Instance(_) => be_to_scalars(&assignments.get_instance(right, None)).into_iter().map(|scalar| scalar.into()).collect(),
         _ => panic!("invalid state")
     };
-    
+
     let gadget = Equality::new(right);
-    
+
     gadget.prove(prover_buffer, &left_vars, &Vec::new());
 }
 
@@ -365,7 +347,7 @@ fn less_than_gadget(
     prover: &mut Prover,
     prover_buffer: &mut ProverBuffer,
     index: usize,
-    coms_file: &mut File
+    commitments: &mut String
 ) {
     let less_than_parser = gadget_grammar::LessThanGadgetParser::new();
     let (left, right) = less_than_parser.parse(line).unwrap();
@@ -375,12 +357,12 @@ fn less_than_gadget(
 
     let gadget = LessThan::new(left_vars[0].into(), Some(left_scalars[0]), right_vars[0].into(), Some(right_scalars[0]));
     let (derived_coms, derived_wtns) = gadget.setup(prover, &Vec::new());
-    
+
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &Vec::new(), &derived_wtns);
-        
+
     assignments.cache_derived_wtns(derived_wtns);
-    assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
+    assignments.parse_derived_witness(derived_coms, index, 0, commitments).expect("unable to generate commitments");
 }
 
 fn inequality_gadget(
@@ -389,7 +371,7 @@ fn inequality_gadget(
     prover: &mut Prover,
     prover_buffer: &mut ProverBuffer,
     index: usize,
-    coms_file: &mut File
+    commitments: &mut String
 ) {
     let inequality_parser = gadget_grammar::InequalityGadgetParser::new();
     let (left, right) = inequality_parser.parse(line).unwrap();
@@ -409,15 +391,15 @@ fn inequality_gadget(
         },
         _ => panic!("invalid state")
     };
-    
+
     let gadget = Inequality::new(right_lc, Some(right_scalars));
     let (derived_coms, derived_wtns) = gadget.setup(prover, &left.0);
-    
+
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &left.2, &derived_wtns);
-        
+
     assignments.cache_derived_wtns(derived_wtns);
-    assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
+    assignments.parse_derived_witness(derived_coms, index, 0, commitments).expect("unable to generate commitments");
 }
 
 fn set_membership_gadget(
@@ -426,7 +408,7 @@ fn set_membership_gadget(
     prover: &mut Prover,
     prover_buffer: &mut ProverBuffer,
     index: usize,
-    coms_file: &mut File
+    commitments: &mut String
 ) {
     let set_membership_parser = gadget_grammar::SetMembershipGadgetParser::new();
     let (member, set) = set_membership_parser.parse(&line).unwrap();
@@ -459,7 +441,7 @@ fn set_membership_gadget(
     if !apply_hashing {
         for element in set.clone() {
             match element {
-                Var::Witness(_) => { 
+                Var::Witness(_) => {
                     let (witness_scalar, _, witness_var, _) = assignments.get_witness(element, None);
                     if witness_var.len() == 1 {
                         witness_set_scalars.push(witness_scalar[0]);
@@ -487,7 +469,7 @@ fn set_membership_gadget(
         let mut hash_number = 1;
         let (scalar, lc) = match member {
             Var::Witness(_) => {
-                let (scalar, var) = hash_witness(prover, prover_buffer, member, assignments, index, hash_number, coms_file);    
+                let (scalar, var) = hash_witness(prover, prover_buffer, member, assignments, index, hash_number, commitments);
                 hash_number += 1;
                 (scalar, var.into())
             },
@@ -506,7 +488,7 @@ fn set_membership_gadget(
         for element in set {
             match element {
                 Var::Witness(_) => {
-                    let (scalar, var) = hash_witness(prover, prover_buffer, element, assignments, index, hash_number, coms_file);
+                    let (scalar, var) = hash_witness(prover, prover_buffer, element, assignments, index, hash_number, commitments);
                     hash_number += 1;
                     witness_set_vars.push(var);
                     witness_set_scalars.push(scalar);
@@ -523,10 +505,10 @@ fn set_membership_gadget(
 
     let gadget = SetMembership::new(member_lc, Some(member_scalar), instance_set_lcs.clone(), Some(instance_set_scalars));
     let (derived_coms, derived_wtns) = gadget.setup(prover, &witness_set_scalars);
-    
+
     prover_buffer.commit_drvd(&derived_wtns);
     gadget.prove(prover_buffer, &witness_set_vars, &derived_wtns);
-        
+
     assignments.cache_derived_wtns(derived_wtns);
-    assignments.parse_derived_wtns(derived_coms, index, 0, coms_file).expect("unable to write .coms file");
+    assignments.parse_derived_witness(derived_coms, index, 0, commitments).expect("unable to generate commitments");
 }
