@@ -4,7 +4,7 @@ This library exposes two methods that allow our Android Java example app to use 
 
 ## Compilation instructions
 
- - Make sure the Android NDK is installed. Generate the architecture toolchains.
+ - Make sure the Android NDK version 22.7171670 is installed. Generate the architecture toolchains.
  - Link the toolchains to your Rust installation via your Cargo config file. Create a file `~/.cargo/config` if it doesn't exist, and place the following into it:
 ```toml
 [target.aarch64-linux-android]
