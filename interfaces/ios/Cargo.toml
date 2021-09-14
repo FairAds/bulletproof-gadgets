@@ -1,0 +1,11 @@
+[package]
+name = "bulletproofs_ios"
+version = "0.1.0"
+authors = ["Camilo Pérez <camilo.perez@unholster.com>"]
+edition = "2018"
+
+[dependencies]
+bulletproofs_gadgets = { path = "../.." }
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
