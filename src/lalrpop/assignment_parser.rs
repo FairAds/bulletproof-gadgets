@@ -7,6 +7,7 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
 use std::collections::HashMap;
+use merlin::Transcript;
 
 // lalrpop parsers
 lalrpop_mod!(var_grammar, "/lalrpop/var_grammar.rs");
@@ -39,7 +40,7 @@ impl Assignments {
     pub fn get_commitment(&self, var: Var, index: usize) -> Variable {
         match self.inquire_commitment(var, index) {
             Ok(commitment) => commitment,
-            Err(message) => panic!(message)
+            Err(message) => panic!("{}", message)
         }
     }
 
@@ -129,7 +130,7 @@ impl Assignments {
     }
 
     /// parse prover commitments from string
-    pub fn parse_commitments(&mut self, commitments: String, verifier: &mut Verifier) -> std::io::Result<()> {
+    pub fn parse_commitments(&mut self, commitments: String, verifier: &mut Verifier<&mut Transcript>) -> std::io::Result<()> {
         let commitment_parser = var_grammar::CommitmentVarParser::new();
         for line in commitments.lines() {
             let (name, bytes) = commitment_parser.parse(&line).unwrap();
@@ -140,7 +141,7 @@ impl Assignments {
     }
 
     /// commit to vars from witness instance to coms instance
-    pub fn parse_witness(&mut self, witness: String, prover: &mut Prover, commitments: &mut String) -> std::io::Result<()> {
+    pub fn parse_witness(&mut self, witness: String, prover: &mut Prover<&mut Transcript>, commitments: &mut String) -> std::io::Result<()> {
         let witness_parser = var_grammar::WitnessVarParser::new();
         for line in witness.lines() {
             let (name, bytes) = witness_parser.parse(&line).unwrap();
@@ -205,12 +206,12 @@ fn format_com(
 }
 
 pub fn assert_32(name: String, assignment: &Vec<u8>) {
-    assert!(assignment.len() <= 32, format!("instance var {} is longer than 32 bytes", &name));
+    assert!(assignment.len() <= 32, "instance var {} is longer than 32 bytes", &name);
 }
 
 pub fn assert_witness_32(
     name: String,
     assignment: &(Vec<Scalar>, Vec<CompressedRistretto>, Vec<Variable>, Vec<u8>)
 ) {
-    assert!(assignment.0.len() == 1, format!("witness var {} is longer than 32 bytes", &name));
+    assert!(assignment.0.len() == 1, "witness var {} is longer than 32 bytes", &name);
 }

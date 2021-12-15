@@ -101,7 +101,7 @@ fn assign_buffer(main: &mut dyn ConstraintSystem, buffer: &ProverBuffer) {
 fn parse_gadget(
     line: &str,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     index: usize,
     commitments: &mut String
@@ -122,7 +122,7 @@ fn parse_conjunction(
     iter: &mut Peekable<Enumerate<std::str::Lines>>,
     line: &str,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     commitments: &mut String,
     initialization: Vec<Vec<Operation>>
@@ -140,7 +140,7 @@ fn get_gadget_op(line: &String) -> GadgetOp {
 }
 
 fn hash_witness(
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     var: Var,
     assignments: &mut Assignments,
@@ -184,7 +184,7 @@ fn hash_instance(
 fn or_conjunction(
     iter: &mut Peekable<Enumerate<std::str::Lines>>,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     parent_prover_buffer: &mut ProverBuffer,
     commitments: &mut String,
     initialization: Vec<Vec<Operation>>
@@ -235,7 +235,7 @@ fn add_commitments_to_parent(parent: &mut ProverBuffer, buffer: &ProverBuffer) {
 fn bounds_check_gadget(
     line: &str,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     index: usize,
     commitments: &mut String
@@ -260,7 +260,7 @@ fn bounds_check_gadget(
 fn mimc_hash_gadget(
     line: &str,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     index: usize,
     commitments: &mut String
@@ -289,7 +289,7 @@ fn mimc_hash_gadget(
 fn merkle_tree_gadget(
     line: &str,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     index: usize,
     commitments: &mut String
@@ -344,7 +344,7 @@ fn equality_gadget(
 fn less_than_gadget(
     line: &str,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     index: usize,
     commitments: &mut String
@@ -368,7 +368,7 @@ fn less_than_gadget(
 fn inequality_gadget(
     line: &str,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     index: usize,
     commitments: &mut String
@@ -405,7 +405,7 @@ fn inequality_gadget(
 fn set_membership_gadget(
     line: &str,
     assignments: &mut Assignments,
-    prover: &mut Prover,
+    prover: &mut Prover<&mut Transcript>,
     prover_buffer: &mut ProverBuffer,
     index: usize,
     commitments: &mut String

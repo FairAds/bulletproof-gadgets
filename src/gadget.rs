@@ -2,28 +2,29 @@ use bulletproofs::r1cs::{ConstraintSystem, Variable, Prover};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use rand::thread_rng;
+use merlin::Transcript;
 
 pub trait Gadget {
-    /// Preprocess witnesses to derive optional gadget-specific commitments 
+    /// Preprocess witnesses to derive optional gadget-specific commitments
     fn preprocess(&self, witnesses: &Vec<Scalar>) -> Vec<Scalar>;
 
     /// Build the constraint system
     fn assemble(
-        &self, 
-        cs: &mut dyn ConstraintSystem, 
-        witnesses: &Vec<Variable>, 
+        &self,
+        cs: &mut dyn ConstraintSystem,
+        witnesses: &Vec<Variable>,
         derived_witnesses: &Vec<(Option<Scalar>, Variable)>
     );
-    
+
     fn setup(
-        &self, 
-        prover: &mut Prover, 
+        &self,
+        prover: &mut Prover<&mut Transcript>,
         witnesses: &Vec<Scalar>
     ) -> (Vec<CompressedRistretto>, Vec<(Option<Scalar>, Variable)>) {
         let derived_scalars: Vec<Scalar> = self.preprocess(witnesses);
 
         // create gadget-specific pedersen commitments
-        let mut commitments: Vec<CompressedRistretto> = Vec::new(); 
+        let mut commitments: Vec<CompressedRistretto> = Vec::new();
         let derived_witnesses: Vec<(Option<Scalar>, Variable)> = derived_scalars
             .iter()
             .cloned()
@@ -38,8 +39,8 @@ pub trait Gadget {
     }
 
     fn prove(
-        &self, 
-        prover: &mut dyn ConstraintSystem, 
+        &self,
+        prover: &mut dyn ConstraintSystem,
         commitment_vars: &Vec<Variable>,
         derived_witnesses: &Vec<(Option<Scalar>, Variable)>
     ) {
@@ -47,9 +48,9 @@ pub trait Gadget {
     }
 
     fn verify(
-        &self, 
-        verifier: &mut dyn ConstraintSystem, 
-        witnesses: &Vec<Variable>, 
+        &self,
+        verifier: &mut dyn ConstraintSystem,
+        witnesses: &Vec<Variable>,
         derived: &Vec<Variable>
     ) {
         let derived_witnesses = derived.iter().cloned().map(|com| (None, com)).collect();
