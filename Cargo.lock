@@ -76,8 +76,8 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
 name = "bulletproofs"
-version = "2.0.0"
-source = "git+https://github.com/FairAds/bulletproofs?branch=new-develop#cae35548ec902b24e9f7425b4f83777e755ae717"
+version = "2.1.0"
+source = "git+https://github.com/FairAds/bulletproofs?tag=2.1.0#3c00b01ec663ae1cbd5a82fdb6c1a4cc96cda967"
 dependencies = [
  "byteorder",
  "clear_on_drop",

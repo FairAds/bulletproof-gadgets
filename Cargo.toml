@@ -18,7 +18,7 @@ zeroize = "1.4.3"
 
 [dependencies.bulletproofs]
 git = "https://github.com/FairAds/bulletproofs"
-branch = "new-develop"
+tag = "2.1.0"
 features = ["std", "yoloproofs", "avx2_backend"]
 
 [build-dependencies]
