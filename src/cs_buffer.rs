@@ -1,4 +1,4 @@
-use bulletproofs::r1cs::{ConstraintSystem, Prover, Verifier, Variable, LinearCombination, R1CSError};
+use bulletproofs::r1cs::{ConstraintSystem, Prover, Verifier, Variable, LinearCombination, R1CSError, Metrics};
 use crate::curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
@@ -19,14 +19,14 @@ pub trait ConstraintSystemBuffer {
     fn buffer_cache(&self) -> &Vec<Vec<Operation>>;
 }
 
-pub struct ProverBuffer<'t, 'g> {
-    prover: Prover<'t, 'g>,
+pub struct ProverBuffer<'g> {
+    prover: Prover<'g, &'g mut Transcript>,
     operation_buffer: Vec<Operation>,
     cached_buffers: Vec<Vec<Operation>>
 }
 
-impl<'t, 'g> ProverBuffer<'t, 'g> {
-    pub fn new(prover: Prover<'t, 'g>) -> ProverBuffer<'t, 'g> {
+impl<'g> ProverBuffer<'g> {
+    pub fn new(prover: Prover<'g, &'g mut Transcript>) -> ProverBuffer<'g> {
         ProverBuffer {
             prover: prover,
             operation_buffer: Vec::new(),
@@ -56,7 +56,7 @@ impl<'t, 'g> ProverBuffer<'t, 'g> {
                     Operation::Multiply((left, right)) => {
                         self.prover.multiply(left.clone(), right.clone());
                     },
-                    Operation::AllocateMultiplier(assignment) => { 
+                    Operation::AllocateMultiplier(assignment) => {
                         assert!(self.prover.allocate_multiplier(assignment.clone()).is_ok());
                     },
                     Operation::Constrain(lc) => {
@@ -71,7 +71,7 @@ impl<'t, 'g> ProverBuffer<'t, 'g> {
     }
 }
 
-impl<'t, 'g> ConstraintSystemBuffer for ProverBuffer<'t, 'g> {
+impl<'g> ConstraintSystemBuffer for ProverBuffer<'g> {
     fn rewind(&mut self) {
         self.cached_buffers.push(self.operation_buffer.clone());
         self.operation_buffer = Vec::new();
@@ -86,7 +86,7 @@ impl<'t, 'g> ConstraintSystemBuffer for ProverBuffer<'t, 'g> {
     }
 }
 
-impl<'t, 'g> ConstraintSystem for ProverBuffer<'t, 'g> {
+impl<'g> ConstraintSystem for ProverBuffer<'g> {
     fn transcript(&mut self) -> &mut Transcript {
         self.prover.transcript()
     }
@@ -105,7 +105,10 @@ impl<'t, 'g> ConstraintSystem for ProverBuffer<'t, 'g> {
         self.operation_buffer.push(Operation::AllocateMultiplier(Some((l.clone(), r.clone()))));
         self.prover.allocate_multiplier(Some((l, r)))
     }
-    
+    fn metrics(&self) -> Metrics {
+        self.prover.metrics()
+    }
+
     fn constrain(&mut self, lc: LinearCombination) {
         self.operation_buffer.push(Operation::Constrain(lc.clone()));
         self.prover.constrain(lc);
@@ -113,13 +116,13 @@ impl<'t, 'g> ConstraintSystem for ProverBuffer<'t, 'g> {
 }
 
 pub struct VerifierBuffer<'t> {
-    verifier: Verifier<'t>,
+    verifier: Verifier<&'t mut Transcript>,
     operation_buffer: Vec<Operation>,
     cached_buffers: Vec<Vec<Operation>>
 }
 
 impl<'t> VerifierBuffer<'t> {
-    pub fn new(verifier: Verifier<'t>) -> VerifierBuffer<'t> {
+    pub fn new(verifier: Verifier<&'t mut Transcript>) -> VerifierBuffer<'t> {
         VerifierBuffer {
             verifier: verifier,
             operation_buffer: Vec::new(),
@@ -137,7 +140,7 @@ impl<'t> VerifierBuffer<'t> {
                     Operation::Multiply((left, right)) => {
                         self.verifier.multiply(left.clone(), right.clone());
                     },
-                    Operation::AllocateMultiplier(assignment) => { 
+                    Operation::AllocateMultiplier(assignment) => {
                         assert!(self.verifier.allocate_multiplier(assignment.clone()).is_ok());
                     },
                     Operation::Constrain(lc) => {
@@ -152,7 +155,7 @@ impl<'t> VerifierBuffer<'t> {
     }
 }
 
-impl<'t> ConstraintSystemBuffer for VerifierBuffer<'t> {    
+impl<'t> ConstraintSystemBuffer for VerifierBuffer<'t> {
     fn rewind(&mut self) {
         self.cached_buffers.push(self.operation_buffer.clone());
         self.operation_buffer = Vec::new();
@@ -185,7 +188,10 @@ impl<'t> ConstraintSystem for VerifierBuffer<'t> {
         self.operation_buffer.push(Operation::AllocateMultiplier(None));
         self.verifier.allocate_multiplier(None)
     }
-    
+
+    fn metrics(&self) -> Metrics {
+        self.verifier.metrics()
+    }
     fn constrain(&mut self, lc: LinearCombination) {
         self.operation_buffer.push(Operation::Constrain(lc.clone()));
         self.verifier.constrain(lc);

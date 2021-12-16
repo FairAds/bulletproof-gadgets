@@ -37,6 +37,8 @@ pub mod conversions;
 pub mod cs_buffer;
 pub mod utils;
 pub mod lalrpop;
+pub mod prove;
+pub mod verify;
 
 //------------------------------------------------------------------------
 // Private modules

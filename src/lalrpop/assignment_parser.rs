@@ -7,16 +7,10 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
 use std::collections::HashMap;
-use std::io::prelude::*;
-use std::io::BufReader;
-use std::fs::File;
+use merlin::Transcript;
 
 // lalrpop parsers
 lalrpop_mod!(var_grammar, "/lalrpop/var_grammar.rs");
-
-const INSTANCE_VARS_EXT: &str = ".inst";
-const WITNESS_VARS_EXT: &str = ".wtns";
-const COMMITMENTS_EXT: &str = ".coms";
 
 pub struct Assignments {
     commitments: HashMap<String, Variable>,
@@ -38,7 +32,7 @@ impl Assignments {
     fn set_instance(&mut self, key: String, val: Vec<u8>) {
         self.instance_vars.insert(key, val);
     }
-    
+
     fn set_commitment(&mut self, key: String, val: Variable) {
         self.commitments.insert(key, val);
     }
@@ -46,7 +40,7 @@ impl Assignments {
     pub fn get_commitment(&self, var: Var, index: usize) -> Variable {
         match self.inquire_commitment(var, index) {
             Ok(commitment) => commitment,
-            Err(message) => panic!(message)
+            Err(message) => panic!("{}", message)
         }
     }
 
@@ -107,8 +101,8 @@ impl Assignments {
     }
 
     pub fn get_witness(
-        &self, 
-        var: Var, 
+        &self,
+        var: Var,
         assertion: Option<&dyn Fn(String, &(Vec<Scalar>, Vec<CompressedRistretto>, Vec<Variable>, Vec<u8>))>
     ) -> (Vec<Scalar>, Vec<CompressedRistretto>, Vec<Variable>, Vec<u8>) {
         match var {
@@ -125,44 +119,36 @@ impl Assignments {
         }
     }
 
-    /// read instance variables from .inst file
-    pub fn parse_inst(&mut self, filename: String) -> std::io::Result<()> {
-        let file = File::open(format!("{}{}", filename, INSTANCE_VARS_EXT))?;
+    /// read instance variables from string
+    pub fn parse_instance(&mut self, instance: String) -> std::io::Result<()> {
         let instance_parser = var_grammar::InstanceVarParser::new();
-        for line in BufReader::new(file).lines() {
-            let (name, bytes) = instance_parser.parse(&line.unwrap()).unwrap();
+        for line in instance.lines() {
+            let (name, bytes) = instance_parser.parse(&line).unwrap();
             self.set_instance(name, bytes);
         }
         Ok(())
     }
 
-    /// read prover commitments from .coms file
-    pub fn parse_coms(&mut self, filename: String, verifier: &mut Verifier) -> std::io::Result<()> {
-        let file = File::open(format!("{}{}", filename, COMMITMENTS_EXT))?;
+    /// parse prover commitments from string
+    pub fn parse_commitments(&mut self, commitments: String, verifier: &mut Verifier<&mut Transcript>) -> std::io::Result<()> {
         let commitment_parser = var_grammar::CommitmentVarParser::new();
-        for line in BufReader::new(file).lines() {
-            let (name, bytes) = commitment_parser.parse(&line.unwrap()).unwrap();
+        for line in commitments.lines() {
+            let (name, bytes) = commitment_parser.parse(&line).unwrap();
             let com = CompressedRistretto::from_slice(&bytes);
             self.set_commitment(name, verifier.commit(com));
         }
         Ok(())
     }
 
-    /// commit to vars from .wtns file to .coms file
-    pub fn parse_wtns(
-        &mut self, 
-        filename: String, 
-        prover: &mut Prover,
-        coms_file: &mut File
-    ) -> std::io::Result<()> {
-        let file = File::open(format!("{}{}", filename, WITNESS_VARS_EXT))?;
+    /// commit to vars from witness instance to coms instance
+    pub fn parse_witness(&mut self, witness: String, prover: &mut Prover<&mut Transcript>, commitments: &mut String) -> std::io::Result<()> {
         let witness_parser = var_grammar::WitnessVarParser::new();
-        for line in BufReader::new(file).lines() {
-            let (name, bytes) = witness_parser.parse(&line.unwrap()).unwrap();
+        for line in witness.lines() {
+            let (name, bytes) = witness_parser.parse(&line).unwrap();
             let commitment = commit(prover, &bytes);
             self.witness_vars.insert(name.clone(), (commitment.0.clone(), commitment.1.clone(), commitment.2.clone(), bytes));
             for (index, com) in commitment.1.iter().enumerate() {
-                coms_file.write_all(&format_com("C", &name[1..name.len()], &index, com))?;
+                commitments.push_str(&format_com("C", &name[1..name.len()], &index, com));
             }
         }
         Ok(())
@@ -170,7 +156,7 @@ impl Assignments {
 
     /// commit all witnesses previously read into the given constraint system (used to create cs buffers)
     pub fn buffer_commit_wtns(
-        &self, 
+        &self,
         prover_buffer: &mut ProverBuffer
     ) {
         for (_, (scalars, _, _, _)) in self.witness_vars.clone() {
@@ -180,7 +166,7 @@ impl Assignments {
 
     /// commit the buffer to all previsouly derived witnesses for the variable index to match the real cs
     pub fn buffer_commit_drvd(
-        &self, 
+        &self,
         prover_buffer: &mut ProverBuffer
     ) {
         for scalar in self.derived_witnesses.clone() {
@@ -194,38 +180,38 @@ impl Assignments {
         }
     }
 
-    /// write derived witness commitment to .coms file
-    pub fn parse_derived_wtns(
+    /// write derived witness commitment to string
+    pub fn parse_derived_witness(
         &self,
         coms: Vec<CompressedRistretto>,
         gadget: usize,
         subroutine: usize,
-        coms_file: &mut File
+        commitments: &mut String
     ) -> std::io::Result<()> {
         for (index, com) in coms.iter().enumerate() {
             let identifier = format!("{}-{}", gadget.to_string(), subroutine);
-            coms_file.write_all(&format_com("D", &identifier, &index, com))?;
+            commitments.push_str(&format_com("D", &identifier, &index, com));
         }
         Ok(())
     }
 }
 
 fn format_com(
-    identifier: &str, 
-    gadget_no: &str, 
-    com_idx: &usize, 
+    identifier: &str,
+    gadget_no: &str,
+    com_idx: &usize,
     com: &CompressedRistretto
-) -> Vec<u8> {
-    format!("{}{}-{} = 0x{}\n", identifier, gadget_no, com_idx, hex::encode(com.as_bytes())).into_bytes()
+) -> String {
+    format!("{}{}-{} = 0x{}\n", identifier, gadget_no, com_idx, hex::encode(com.as_bytes()))
 }
 
 pub fn assert_32(name: String, assignment: &Vec<u8>) {
-    assert!(assignment.len() <= 32, format!("instance var {} is longer than 32 bytes", &name));
+    assert!(assignment.len() <= 32, "instance var {} is longer than 32 bytes", &name);
 }
 
 pub fn assert_witness_32(
-    name: String, 
+    name: String,
     assignment: &(Vec<Scalar>, Vec<CompressedRistretto>, Vec<Variable>, Vec<u8>)
 ) {
-    assert!(assignment.0.len() == 1, format!("witness var {} is longer than 32 bytes", &name));
+    assert!(assignment.0.len() == 1, "witness var {} is longer than 32 bytes", &name);
 }

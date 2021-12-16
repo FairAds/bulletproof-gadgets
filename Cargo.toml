@@ -1,26 +1,28 @@
 [package]
 name = "bulletproofs_gadgets"
-version = "0.1.0"
-authors = ["Marc Kloter"]
+version = "0.2.0"
+authors = ["Marc Kloter", "Sebastián Gálvez <sebastian.galvez@unholster.com>"]
 build = "build.rs"
 
 [dependencies]
-curve25519-dalek = { version = "1", features = ["serde"] }
-rand = "0.6"
-merlin = "1.1.0"
+curve25519-dalek = { version = "3", features = ["serde"] }
+packed_simd_2 = "0.3.6"
+rand = "0.7"
+merlin = { version = "2", default-features = false }
 pkcs7 = "1.0.0"
-hex = "0.3.2"
-regex = "1.1.9"
+hex = "0.4.3"
+regex = "1.5.4"
 libmath = "0.2.1"
-lalrpop-util = "0.17.1"
+lalrpop-util = "0.19.5"
+zeroize = "1.4.3"
 
 [dependencies.bulletproofs]
-git = "https://github.com/MarcKloter/bulletproofs"
-branch = "develop"
-features = ["yoloproofs", "avx2_backend"]
+git = "https://github.com/FairAds/bulletproofs"
+tag = "2.1.0"
+features = ["std", "yoloproofs", "avx2_backend"]
 
 [build-dependencies]
-lalrpop = "0.17.1"
+lalrpop = "0.19.5"
 
 [[bin]]
 name = "prover"
